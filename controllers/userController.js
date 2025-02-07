@@ -177,7 +177,7 @@ const verifyResetCode = async (req, res) => {
     }
 
     // Generate a JWT token for password reset
-    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "1hr" });
+    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "2m" });
     console.log(resetToken);
 
     return res.json({ message: "Reset code verified", resetToken });
