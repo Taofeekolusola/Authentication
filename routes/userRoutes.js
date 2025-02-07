@@ -14,9 +14,9 @@ const {
 route.post('/earn', SignupHandlerTaskEarner);
 route.post('/create', SignupHandlerTaskCreator);
 route.post('/login', loginHandler);
-route.post('/request', validation, requestPasswordReset);
-route.post('/reset', validation, resetPassword);
-route.post('/verify', validation, verifyResetCode);
+route.post('/request', requestPasswordReset);
+route.post('/reset',  resetPassword);
+route.post('/verify', verifyResetCode);
 route.get('/auth', validation, (req, res) => {
     res.json(req.user)
 })
