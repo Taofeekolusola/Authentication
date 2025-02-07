@@ -114,108 +114,122 @@ const loginHandler = async (req, res) => {
     }
 };
 
-  
+// Function to send email
 const sendEmail = async (email, resetCode) => {
   const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-      },
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
   });
 
   const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Password Reset Code',
-      html: `<p>Your password reset code is: <strong>${resetCode}</strong></p> 
-             <p>Use this code to reset your password. The code expires in 1 hour.</p>`,
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Password Reset Code",
+    html: `<p>Your password reset code is: <strong>${resetCode}</strong></p> 
+           <p>Use this code to reset your password. The code expires in 1 hour.</p>`,
   };
 
   await transporter.sendMail(mailOptions);
-  
-  console.log("Reset Code Sent:", resetCode); // Debugging log
 };
-  
-  //desc request password reset (send reset link)
-  //route
-  //access private
 
-  const requestPasswordReset = async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
+// Request Password Reset (Send Code to Email)
+const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Generate a 6-digit reset code
-        const resetCode = crypto.randomInt(100000, 999999).toString();
-        const expiresAt = Date.now() + 3600000; // Expires in 1 hour
-
-        // Save the reset code using the correct field names
-        user.resetPasswordToken = resetCode;
-        user.resetPasswordExpiresAt = expiresAt;
-        await user.save();
-
-        console.log("Generated Reset Code:", resetCode);
-
-        // Send the reset code via email
-        await sendEmail(user.email, resetCode);
-
-        return res.status(200).json({ message: 'Password reset code sent to your email' });
-
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    // Generate reset code (6-digit)
+    const resetCode = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = Date.now() + 3600000; // 1-hour expiry
+
+    // Save reset code and expiration in the database
+    user.resetPasswordToken = resetCode;
+    user.resetPasswordExpiresAt = expiresAt;
+    await user.save();
+
+    // Send reset code via email
+    await sendEmail(user.email, resetCode);
+
+    return res.status(200).json({ message: "Password reset code sent to your email" });
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 };
 
-  
-  //desc resets a user password
-  //route post /auth/reset
-  //access private
-  const resetPassword = async (req, res) => {
-    try {
-        const { email, resetCode, newPassword } = req.body;
+// Verify Reset Code
+const verifyResetCode = async (req, res) => {
+  try {
+    const { resetCode } = req.body;
 
-        // Find the user by email
-        const user = await User.findOne({ email });
+    // Find user by reset code
+    const user = await User.findOne({ resetPasswordToken: resetCode });
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Check if reset code matches
-        if (user.resetPasswordToken !== resetCode) {
-            return res.status(400).json({ message: 'Invalid reset code' });
-        }
-
-        // Check if reset code has expired
-        if (Date.now() > user.resetPasswordExpiresAt) {
-            return res.status(400).json({ message: 'Reset code has expired' });
-        }
-
-        // Hash new password before saving
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Update the user's password and clear the reset code fields
-        user.password = hashedPassword;
-        user.resetPasswordToken = null;
-        user.resetPasswordExpiresAt = null;
-        await user.save();
-
-        return res.json({ message: 'Password has been reset successfully' });
-
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+    if (!user || Date.now() > user.resetPasswordExpiresAt) {
+      return res.status(400).json({ message: "Invalid or expired reset code" });
     }
+
+    // Generate a JWT token for password reset
+    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "1hr" });
+    console.log(resetToken);
+
+    return res.json({ message: "Reset code verified", resetToken });
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 };
 
+// Reset Password
+const resetPassword = async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from header
+
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized request" });
+    }
+
+    // Verify and decode the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findOne({ email: decoded.email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Ensure passwords match
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    // Hash the new password before saving
+    user.password = await bcrypt.hash(password, 10);
+
+    // Clear reset fields
+    user.resetPasswordToken = null;
+    user.resetPasswordExpiresAt = null;
+    await user.save();
+
+    return res.json({ message: "Password has been reset successfully" });
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+  
 module.exports = {
     SignupHandlerTaskCreator,
     SignupHandlerTaskEarner,
     loginHandler,
     requestPasswordReset,
     resetPassword,
+    verifyResetCode,
 };
