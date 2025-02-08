@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./db'); 
+const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
-
 require('dotenv').config();
 
 const app = express();
@@ -10,16 +9,17 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Enable CORS with proper settings
-app.use(cors({
-    origin: '*', // Allow all origins (try 'http://localhost:3000' if frontend is local)
-    credentials: true,
+// CORS Configuration
+const corsOptions = {
+    origin: process.env.CLIENT_URL || 'http://localhost:3000', // Allow frontend origin
+    credentials: true, // Allow cookies/auth headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
-}));
+};
 
 // Middleware
-app.use(express.json());
+app.use(express.json()); // Parse JSON request body
+app.use(cors(corsOptions)); // Apply CORS
 
 // Routes
 app.use('/users', userRoutes);
@@ -31,10 +31,11 @@ app.use((req, res) => {
 
 // Central error handling middleware
 app.use((err, req, res, next) => {
-    if (process.env.NODE_ENV === 'development') {
-        console.error(err.stack);
-    }
-    res.status(500).json({ message: err.message || 'Internal Server Error' });
+    console.error('Error:', err.message); // Log error
+
+    res.status(500).json({
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+    });
 });
 
 // Start the server
