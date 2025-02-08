@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 require('dotenv').config();
@@ -9,17 +10,19 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// CORS Configuration
+// CORS Configuration (Allow Frontend to Access Cookies)
 const corsOptions = {
     origin: process.env.CLIENT_URL || 'http://localhost:3000', // Allow frontend origin
     credentials: true, // Allow cookies/auth headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+    exposedHeaders: ['set-cookie'] // Allow frontend to read cookies
 };
 
 // Middleware
 app.use(express.json()); // Parse JSON request body
 app.use(cors(corsOptions)); // Apply CORS
+app.use(cookieParser()); // Parse cookies from requests
 
 // Routes
 app.use('/users', userRoutes);
