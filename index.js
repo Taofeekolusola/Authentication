@@ -11,25 +11,35 @@ const app = express();
 connectDB(); // Call the function
 
 // Middleware
-app.use(cors({
-    origin: 'http://localhost:3000', // Allow requests from frontend
-    credentials: true, // Allow cookies if needed
-}));
-
 app.use(express.json());
+
+// Handle CORS & Preflight Requests
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200); // Handle preflight requests
+    }
+    next();
+});
 
 // Routes
 app.use('/users', userRoutes);
 
 // Handle undefined routes
-app.use((req, res, next) => {
+app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
 // Central error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ message: 'Internal Server Error' });
+    if (process.env.NODE_ENV === 'development') {
+        console.error(err.stack);
+    }
+    res.status(500).json({ message: err.message || 'Internal Server Error' });
 });
 
 // Start the server
