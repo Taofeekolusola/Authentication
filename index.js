@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./db'); // Import the function
+const connectDB = require('./db'); // Import database connection
 const userRoutes = require('./routes/userRoutes');
 
 require('dotenv').config();
@@ -8,23 +8,26 @@ require('dotenv').config();
 const app = express();
 
 // Connect to MongoDB
-connectDB(); // Call the function
+connectDB(); 
+
+// CORS Configuration
+const corsOptions = {
+    origin: 'http://localhost:3000', // Allow requests from frontend
+    credentials: true, // Allow cookies & authentication headers
+    methods: 'GET, POST, PUT, DELETE, OPTIONS',
+    allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+};
+
+app.use(cors(corsOptions)); // Apply CORS middleware
+
+// Handle Preflight Requests Manually (for some strict policies)
+app.options('*', (req, res) => {
+    res.set(corsOptions);
+    res.sendStatus(200);
+});
 
 // Middleware
 app.use(express.json());
-
-// Handle CORS & Preflight Requests
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200); // Handle preflight requests
-    }
-    next();
-});
 
 // Routes
 app.use('/users', userRoutes);
@@ -36,10 +39,8 @@ app.use((req, res) => {
 
 // Central error handling middleware
 app.use((err, req, res, next) => {
-    if (process.env.NODE_ENV === 'development') {
-        console.error(err.stack);
-    }
-    res.status(500).json({ message: err.message || 'Internal Server Error' });
+    console.error(err.stack);
+    res.status(500).json({ message: 'Internal Server Error' });
 });
 
 // Start the server
