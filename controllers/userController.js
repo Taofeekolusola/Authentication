@@ -30,13 +30,14 @@ const SignupHandlerTaskEarner = async (req, res) => {
       password: hashedPassword,
       lastName,
       phoneNumber,
+      isTaskEarner: true,
       confirmPassword
     });
 
     return res.status(201).json({
       success: true,
       message: "Task Earner created!",
-      userId: newUser._id,
+      newUser
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -71,12 +72,13 @@ const SignupHandlerTaskCreator = async (req, res) => {
       lastName,
       phoneNumber,
       isTaskCreator: true,
+      confirmPassword
     });
 
     return res.status(201).json({
       success: true,
       message: "Task Creator created!",
-      userId: newUser._id,
+      newUser
     });
   } catch (error) {
     console.error("Signup error:", error);
