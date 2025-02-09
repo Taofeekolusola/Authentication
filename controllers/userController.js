@@ -30,8 +30,7 @@ const SignupHandlerTaskEarner = async (req, res) => {
       password: hashedPassword,
       lastName,
       phoneNumber,
-      isTaskEarner: true,
-      confirmPassword: hashedPassword
+      confirmPassword
     });
 
     return res.status(201).json({
