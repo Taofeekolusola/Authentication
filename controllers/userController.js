@@ -7,7 +7,7 @@ const crypto = require('crypto');
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
   const { firstName, email, password, lastName, phoneNumber, confirmPassword } = req.body;
-  
+
   try {
     if (!firstName || !email || !password || !lastName || !phoneNumber || !confirmPassword) {
       return res.status(400).json({ message: "Invalid user details" });
@@ -171,9 +171,18 @@ const verifyResetCode = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired reset code" });
     }
 
-    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    // Generate the verification token
+    const verificationToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-    return res.json({ message: "Reset code verified", resetToken });
+    // Calculate the expiration date
+    const verificationTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+    // Save the token and expiration date in the database
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpiresAt = verificationTokenExpiresAt;
+    await user.save();
+
+    return res.json({ message: "Reset code verified", verificationToken });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
