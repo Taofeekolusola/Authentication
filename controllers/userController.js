@@ -171,7 +171,7 @@ const verifyResetCode = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired reset code" });
     }
 
-    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "2m" });
+    const resetToken = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
     return res.json({ message: "Reset code verified", resetToken });
   } catch (error) {
