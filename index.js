@@ -3,6 +3,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -26,6 +27,7 @@ app.use(cookieParser()); // Parse cookies from requests
 
 // Routes
 app.use('/users', userRoutes);
+app.use('/tasks', taskRoutes);
 
 // Handle undefined routes
 app.use((req, res) => {
