@@ -2,12 +2,24 @@ const mongoose = require("mongoose");
 const Task = require("../models/Tasks");
 
 // Create Task Handler
-const createTaskHandler = async (req, res, next) => {
-  const { title, description, createdBy, type, platform, amount, assignedTo } = req.body;
+const createTaskHandler = async (req, res) => {
+  const {
+    title,
+    requirements,
+    description,
+    compensation,
+    deadline,
+    additionalInfo,
+    createdBy,
+    type,
+    numberOfRespondents,
+    location,
+    assignedTo
+  } = req.body;
 
   try {
     // Validate required fields
-    if (!title || !description || !createdBy || !type || !platform || !amount || assignedTo === undefined) {
+    if (!title || !description || !numberOfRespondents || !requirements || !type || !location || !additionalInfo || !deadline || !compensation || assignedTo === undefined) {
       res.status(400).json("Missing required fields");
     }
 
@@ -16,14 +28,26 @@ const createTaskHandler = async (req, res, next) => {
       res.status(400).json("Invalid user ID");
     }
 
+    const match = compensation.match(/^([\$#])(\d+)$/); // Matches "$500" or "#500"
+    if (!match) {
+      return res.status(400).json("Invalid compensation format. Use '$500' or '#500'");
+    }
+
+    const [, currency, amount] = match;
+    const parsedCompensation = { currency, amount: Number(amount) };
+
     const task = await Task.create({
       title,
       description,
       createdBy: new mongoose.Types.ObjectId(createdBy),
       type,
-      platform,
-      amount,
+      deadline,
+      compensation: parsedCompensation,
       assignedTo,
+      additionalInfo,
+      numberOfRespondents,
+      location,
+      requirements
     });
 
     res.status(201).json({
@@ -32,12 +56,15 @@ const createTaskHandler = async (req, res, next) => {
       task,
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
   }
 };
 
 // Update Task Handler
-const updateTaskHandler = async (req, res, next) => {
+const updateTaskHandler = async (req, res) => {
   const { taskId } = req.params;
   const updatedData = req.body;
   try {
@@ -57,12 +84,15 @@ const updateTaskHandler = async (req, res, next) => {
       task: { ...task.toObject(), ...updatedData },
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
   }
 };
 
 // Delete Task Handler
-const deleteTaskHandler = async (req, res, next) => {
+const deleteTaskHandler = async (req, res) => {
   const { taskId } = req.params;
   try {
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
@@ -80,7 +110,10 @@ const deleteTaskHandler = async (req, res, next) => {
       message: "Task deleted successfully!",
     });
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
   }
 };
 

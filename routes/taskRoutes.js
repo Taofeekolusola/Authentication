@@ -10,6 +10,6 @@ const {
 
 route.post('/create', validation, createTaskHandler);
 route.put('/update/:taskId', validation, updateTaskHandler);
-route.post('/login', validation, deleteTaskHandler);
+route.post('/delete/:taskId', validation, deleteTaskHandler);
 
 module.exports = route;

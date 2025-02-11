@@ -8,43 +8,61 @@ const TaskSchema = new mongoose.Schema(
         required: true,
         trim: true,  // Remove leading/trailing spaces
       },
+      type: {
+        type: String,
+        required: true,  // Ensure task type is provided
+      },
+      numberOfRespondents: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null, // Optional field for the number of respondents
+      },
+      createdBy: {
+       type: mongoose.Schema.Types.ObjectId,
+       ref: 'User',
+       required: false,
+      },
+      assignedTo: {
+       type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,  // Optional field for task assignments
+        },
       description: {
         type: String,
         required: true,
         trim: true,  // Remove leading/trailing spaces
       },
-      createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-      },
-      assignedTo: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null,  // Optional field for task assignments
-      },
-      status: {
+      location: {
         type: String,
-        enum: ['pending', 'completed', 'cancelled', 'under review', 'approved'],
-        default: 'pending',  // Default task status
+        enum: ['Remote', 'Onsite'],
+        default: null, // Optional field for location
       },
-      type: {
-        type: String,
-        required: true,  // Ensure task type is provided
+      compensation: {
+        currency: {
+          type: String,
+          enum: ['$', '#'], // Only allow Dollar or Naira symbols
+          required: true
+        },
+        amount: {
+          type: Number, // Store the numeric value separately
+          required: true
+        }
       },
-      platform: {
-        type: String,
-        required: true,  // Ensure platform is provided
-      },
-      amount: {
-        type: Number,
-        required: true,
-        min: 0,  // Ensure amount is non-negative
-      },
-      performedAt: {
+      deadline: {
         type: Date,
-        default: null,  // Set when task is completed
+        required: true, // Ensure deadline is provided
       },
+      requirements: {
+        type: String,
+        required: true, // Ensure requirements are provided
+      },
+      additionalInfo: [
+        {
+          type: String, // Can store file paths, URLs, or image links
+          default: [],
+        }
+      ]
     },
     {
       timestamps: true,  // Automatically handles `createdAt` and `updatedAt`
