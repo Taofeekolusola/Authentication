@@ -191,14 +191,19 @@ const verifyResetCode = async (req, res) => {
 // Reset Password
 const resetPassword = async (req, res) => {
   try {
-    const { password, confirmPassword } = req.body;
-    const token = req.headers.authorization?.split(" ")[1];
+    const { password, confirmPassword, resetCode, email } = req.body;
+    
+    if (!email && !resetCode) {
+      return res.status(400).json({ message: "Email or reset code is required" });
+    } 
 
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized request" });
-    }
+    //const token = req.headers.authorization?.split(" ")[1];
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // if (!token) {
+    //   return res.status(401).json({ message: "Unauthorized request" });
+    // }
+
+    // const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findOne({ email: decoded.email });
 
     if (!user) {
