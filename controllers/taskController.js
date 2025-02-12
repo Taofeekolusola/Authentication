@@ -79,7 +79,7 @@ const createTaskHandler = async (req, res) => {
 
   try {
     // Validate required fields
-    if (!title || !description || !requirements || !taskType || !location || !additionalInfo || !deadline || !compensation || !link1 || !link2) {
+    if (!title || !description || !requirements || !taskType || !location || !additionalInfo || !deadline || !link1 || !link2) {
       res.status(400).json("Missing required fields");
     }
 
