@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+// Define the schema for additionalInfo
+const AdditionalInfoSchema = new mongoose.Schema(
+  {
+    type: { type: String, required: true }, // e.g., "file", "url", "image"
+    value: { type: String, required: true }, // Stores file path, URL, or image link
+  },
+  { _id: false } // Prevents Mongoose from automatically creating an _id for each object
+);
+
 // Define the Task schema
 const TaskSchema = new mongoose.Schema(
   {
@@ -52,12 +61,7 @@ const TaskSchema = new mongoose.Schema(
       required: true, // Ensure requirements are provided
     },
     additionalInfo: {
-      type: [
-        {
-          type: { type: String, required: true }, // e.g., "file", "url", "image"
-          value: { type: String, required: true }, // Stores file path, URL, or image link
-        },
-      ],
+      type: [AdditionalInfoSchema], // Use the defined schema for validation
       default: [],
     },
   },
