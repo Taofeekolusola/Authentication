@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const multer = require("multer");
 const Task = require("../models/Tasks");
 
 // Create Task Handler
@@ -63,37 +64,79 @@ const Task = require("../models/Tasks");
 //   }
 // };
 
-const createTaskHandler = async (req, res) => {
-  const {
-    title,
-    requirements,
-    description,
-    compensation,
-    deadline,
-    additionalInfo,
-    link1,
-    taskType,
-    location,
-    link2
-  } = req.body;
+// Configure Multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Store files in uploads/ directory
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`); // Unique filenames
+  },
+});
+const upload = multer({ storage });
 
+// Task creation handler
+const createTaskHandler = async (req, res) => {
   try {
+    const {
+      title,
+      requirements,
+      description,
+      compensation,
+      deadline,
+      link1,
+      taskType,
+      location,
+      link2,
+      additionalInfo, // Fetch additionalInfo directly
+    } = req.body;
+
     // Validate required fields
-    if (!title || !description || !requirements || !taskType || !location || !additionalInfo || !deadline || !link1 || !link2) {
-      res.status(400).json("Missing required fields");
+    if (!title || !description || !requirements || !taskType || !location || !deadline) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    if (!compensation || typeof compensation !== "object" || !compensation.currency || !compensation.amount) { return res.status(400).json("Invalid compensation format. It should be an object with currency and amount."); }
-    const parsedCompensation = { currency: compensation.currency.toUpperCase(), amount: Number(compensation.amount), };
+    if (!compensation || typeof compensation !== "object" || !compensation.currency || !compensation.amount) {
+      return res.status(400).json({ error: "Invalid compensation format. It should be an object with currency and amount." });
+    }
 
-//     const match = compensation.match(/^(USD|EUR)(\d+)$/i); // Matches "USD500" or "EUR500"
-// if (!match) {
-//   return res.status(400).json("Invalid compensation format. Use 'USD500' or 'EUR500'");
-// }
+    const parsedCompensation = {
+      currency: compensation.currency.toUpperCase(),
+      amount: Number(compensation.amount),
+    };
 
-// const [, currency, amount] = match;
-// const parsedCompensation = { currency: currency.toUpperCase(), amount: Number(amount) };
+    let additionalInfoArray = [];
 
+    // If a file was uploaded, store it in additionalInfo
+    if (req.file) {
+      additionalInfoArray.push({
+        type: "file",
+        value: `/uploads/${req.file.filename}`,
+      });
+    }
+
+    // Handle additionalInfo correctly
+    if (additionalInfo) {
+      try {
+        let parsedAdditionalInfo = additionalInfo;
+
+        // If additionalInfo is a string, parse it
+        if (typeof additionalInfo === "string") {
+          parsedAdditionalInfo = JSON.parse(additionalInfo);
+        }
+
+        // Ensure additionalInfo is an array of objects
+        if (Array.isArray(parsedAdditionalInfo) && parsedAdditionalInfo.every(item => item.type && item.value)) {
+          additionalInfoArray = [...additionalInfoArray, ...parsedAdditionalInfo];
+        } else {
+          return res.status(400).json({ error: "Invalid additionalInfo format. Must be an array of objects with 'type' and 'value' fields." });
+        }
+      } catch (error) {
+        return res.status(400).json({ error: "Invalid additionalInfo format. Must be valid JSON." });
+      }
+    }
+
+    // Create the task
     const task = await Task.create({
       title,
       description,
@@ -102,9 +145,9 @@ const createTaskHandler = async (req, res) => {
       deadline,
       compensation: parsedCompensation,
       link2,
-      additionalInfo,
+      additionalInfo: additionalInfoArray,
       location,
-      requirements
+      requirements,
     });
 
     res.status(201).json({
@@ -116,7 +159,7 @@ const createTaskHandler = async (req, res) => {
     res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
-    })
+    });
   }
 };
 
@@ -178,4 +221,5 @@ module.exports = {
     createTaskHandler,
     updateTaskHandler,
     deleteTaskHandler,
+    upload,
 }
