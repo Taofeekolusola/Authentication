@@ -1,6 +1,5 @@
 const express = require('express');
 const route = express.Router();
-const { validation } = require('../middleware/auth');
 const {
     createTaskHandler,
     updateTaskHandler,
@@ -8,8 +7,8 @@ const {
 } = require('../controllers/taskController');
 
 
-route.post('/create', validation, createTaskHandler);
-route.put('/update/:taskId', validation, updateTaskHandler);
-route.post('/delete/:taskId', validation, deleteTaskHandler);
+route.post('/create', createTaskHandler);
+route.put('/update/:taskId', updateTaskHandler);
+route.post('/delete/:taskId', deleteTaskHandler);
 
 module.exports = route;

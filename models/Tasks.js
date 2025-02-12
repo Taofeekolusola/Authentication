@@ -8,26 +8,20 @@ const TaskSchema = new mongoose.Schema(
         required: true,
         trim: true,  // Remove leading/trailing spaces
       },
-      type: {
+      taskType: {
         type: String,
         required: true,  // Ensure task type is provided
       },
-      numberOfRespondents: {
-        type: Number,
-        min: 1,
-        max: 5,
-        default: null, // Optional field for the number of respondents
+      link1: {
+        type: String,
+        default: null,
+        required: false
       },
-      createdBy: {
-       type: mongoose.Schema.Types.ObjectId,
-       ref: 'User',
-       required: false,
+      link2: {
+      type: String,
+      default: null,
+      required: false
       },
-      assignedTo: {
-       type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null,  // Optional field for task assignments
-        },
       description: {
         type: String,
         required: true,
@@ -35,13 +29,13 @@ const TaskSchema = new mongoose.Schema(
       },
       location: {
         type: String,
-        enum: ['Remote', 'Onsite'],
+        enum: ['Remote', 'On-site'],
         default: null, // Optional field for location
       },
       compensation: {
         currency: {
           type: String,
-          enum: ['$', '#'], // Only allow Dollar or Naira symbols
+          enum: ['USD', 'EUR'], // Only allow Dollar or Naira symbols
           required: true
         },
         amount: {

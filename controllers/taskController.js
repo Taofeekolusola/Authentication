@@ -2,6 +2,67 @@ const mongoose = require("mongoose");
 const Task = require("../models/Tasks");
 
 // Create Task Handler
+// const createTaskHandler = async (req, res) => {
+//   const {
+//     title,
+//     requirements,
+//     description,
+//     compensation,
+//     deadline,
+//     additionalInfo,
+//     createdBy,
+//     type,
+//     numberOfRespondents,
+//     location,
+//     assignedTo
+//   } = req.body;
+
+//   try {
+//     // Validate required fields
+//     if (!title || !description || !numberOfRespondents || !requirements || !type || !location || !additionalInfo || !deadline || !compensation || assignedTo === undefined) {
+//       res.status(400).json("Missing required fields");
+//     }
+
+//     // Validate the `createdBy` field as a valid ObjectId
+//     if (!mongoose.Types.ObjectId.isValid(createdBy)) {
+//       res.status(400).json("Invalid user ID");
+//     }
+
+//     const match = compensation.match(/^([\$#])(\d+)$/); // Matches "$500" or "#500"
+//     if (!match) {
+//       return res.status(400).json("Invalid compensation format. Use '$500' or '#500'");
+//     }
+
+//     const [, currency, amount] = match;
+//     const parsedCompensation = { currency, amount: Number(amount) };
+
+//     const task = await Task.create({
+//       title,
+//       description,
+//       createdBy: new mongoose.Types.ObjectId(createdBy),
+//       type,
+//       deadline,
+//       compensation: parsedCompensation,
+//       assignedTo,
+//       additionalInfo,
+//       numberOfRespondents,
+//       location,
+//       requirements
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Task created successfully!",
+//       task,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: "Internal Server Error",
+//       error: error.message,
+//     })
+//   }
+// };
+
 const createTaskHandler = async (req, res) => {
   const {
     title,
@@ -10,42 +71,35 @@ const createTaskHandler = async (req, res) => {
     compensation,
     deadline,
     additionalInfo,
-    createdBy,
-    type,
-    numberOfRespondents,
+    link1,
+    taskType,
     location,
-    assignedTo
+    link2
   } = req.body;
 
   try {
     // Validate required fields
-    if (!title || !description || !numberOfRespondents || !requirements || !type || !location || !additionalInfo || !deadline || !compensation || assignedTo === undefined) {
+    if (!title || !description || !requirements || !taskType || !location || !additionalInfo || !deadline || !compensation || !link1 || !link2) {
       res.status(400).json("Missing required fields");
     }
 
-    // Validate the `createdBy` field as a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(createdBy)) {
-      res.status(400).json("Invalid user ID");
-    }
+    const match = compensation.match(/^(USD|EUR)(\d+)$/i); // Matches "USD500" or "EUR500"
+if (!match) {
+  return res.status(400).json("Invalid compensation format. Use 'USD500' or 'EUR500'");
+}
 
-    const match = compensation.match(/^([\$#])(\d+)$/); // Matches "$500" or "#500"
-    if (!match) {
-      return res.status(400).json("Invalid compensation format. Use '$500' or '#500'");
-    }
-
-    const [, currency, amount] = match;
-    const parsedCompensation = { currency, amount: Number(amount) };
+const [, currency, amount] = match;
+const parsedCompensation = { currency: currency.toUpperCase(), amount: Number(amount) };
 
     const task = await Task.create({
       title,
       description,
-      createdBy: new mongoose.Types.ObjectId(createdBy),
-      type,
+      link1,
+      taskType,
       deadline,
       compensation: parsedCompensation,
-      assignedTo,
+      link2,
       additionalInfo,
-      numberOfRespondents,
       location,
       requirements
     });

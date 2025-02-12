@@ -87,9 +87,36 @@ const SignupHandlerTaskCreator = async (req, res) => {
 };
 
 // Login Handler
+// const loginHandler = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     const user = await User.findOne({ email });
+//     if (!user) {
+//       return res.status(401).json({ message: "Invalid email or password" });
+//     }
+
+//     const isPasswordValid = await bcrypt.compare(password, user.password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({ message: "Invalid email or password" });
+//     }
+
+//     const token = jwt.sign(
+//       { id: user._id, email: user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: '7d' }
+//     );
+
+//     return res.status(200).json({ token });
+//   } catch (error) {
+//     console.error("Login error:", error);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
 const loginHandler = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -101,18 +128,31 @@ const loginHandler = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Set token expiration based on 'rememberMe'
+    const tokenExpiration = rememberMe ? '30d' : '1d'; // 30 days if checked, 1 day otherwise
+    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: tokenExpiration }
     );
 
-    return res.status(200).json({ token });
+    // Set cookie based on 'rememberMe'
+    res.cookie("authToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: cookieMaxAge, // 30 days or 1 day
+    });
+
+    return res.status(200).json({ message: "Login successful" });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // Send Email Helper Function
 const sendEmail = async (email, resetCode) => {
