@@ -83,13 +83,16 @@ const createTaskHandler = async (req, res) => {
       res.status(400).json("Missing required fields");
     }
 
-    const match = compensation.match(/^(USD|EUR)(\d+)$/i); // Matches "USD500" or "EUR500"
-if (!match) {
-  return res.status(400).json("Invalid compensation format. Use 'USD500' or 'EUR500'");
-}
+    if (!compensation || typeof compensation !== "object" || !compensation.currency || !compensation.amount) { return res.status(400).json("Invalid compensation format. It should be an object with currency and amount."); }
+    const parsedCompensation = { currency: compensation.currency.toUpperCase(), amount: Number(compensation.amount), };
 
-const [, currency, amount] = match;
-const parsedCompensation = { currency: currency.toUpperCase(), amount: Number(amount) };
+//     const match = compensation.match(/^(USD|EUR)(\d+)$/i); // Matches "USD500" or "EUR500"
+// if (!match) {
+//   return res.status(400).json("Invalid compensation format. Use 'USD500' or 'EUR500'");
+// }
+
+// const [, currency, amount] = match;
+// const parsedCompensation = { currency: currency.toUpperCase(), amount: Number(amount) };
 
     const task = await Task.create({
       title,
