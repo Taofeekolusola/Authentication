@@ -9,6 +9,6 @@ const {
 
 route.post('/create', createTaskHandler);
 route.put('/update/:taskId', updateTaskHandler);
-route.post('/delete/:taskId', deleteTaskHandler);
+route.delete('/delete/:taskId', deleteTaskHandler);
 
 module.exports = route;
