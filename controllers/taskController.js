@@ -217,9 +217,27 @@ const deleteTaskHandler = async (req, res) => {
   }
 };
 
+// Fetch all tasks handler
+const getAllTasksHandler = async (req, res) => {
+  try {
+    const tasks = await Task.find({});
+    res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      tasks,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
 module.exports = {
     createTaskHandler,
     updateTaskHandler,
     deleteTaskHandler,
     upload,
+    getAllTasksHandler,
 }
