@@ -265,6 +265,21 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// Get User by Id
+const getUserByIdHandler = async (req, res) => {
+  try {
+    const userId = await User.findById(req.params.id)
+
+    if (!userId) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({ userId });
+  } catch (error) {
+    console.error("Get user by id error:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -272,4 +287,5 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   verifyResetCode,
+  getUserByIdHandler
 };

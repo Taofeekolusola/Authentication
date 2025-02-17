@@ -1,83 +1,12 @@
 const mongoose = require("mongoose");
-const multer = require("multer");
 const Task = require("../models/Tasks");
 
-// Create Task Handler
-// const createTaskHandler = async (req, res) => {
-//   const {
-//     title,
-//     requirements,
-//     description,
-//     compensation,
-//     deadline,
-//     additionalInfo,
-//     createdBy,
-//     type,
-//     numberOfRespondents,
-//     location,
-//     assignedTo
-//   } = req.body;
 
-//   try {
-//     // Validate required fields
-//     if (!title || !description || !numberOfRespondents || !requirements || !type || !location || !additionalInfo || !deadline || !compensation || assignedTo === undefined) {
-//       res.status(400).json("Missing required fields");
-//     }
-
-//     // Validate the `createdBy` field as a valid ObjectId
-//     if (!mongoose.Types.ObjectId.isValid(createdBy)) {
-//       res.status(400).json("Invalid user ID");
-//     }
-
-//     const match = compensation.match(/^([\$#])(\d+)$/); // Matches "$500" or "#500"
-//     if (!match) {
-//       return res.status(400).json("Invalid compensation format. Use '$500' or '#500'");
-//     }
-
-//     const [, currency, amount] = match;
-//     const parsedCompensation = { currency, amount: Number(amount) };
-
-//     const task = await Task.create({
-//       title,
-//       description,
-//       createdBy: new mongoose.Types.ObjectId(createdBy),
-//       type,
-//       deadline,
-//       compensation: parsedCompensation,
-//       assignedTo,
-//       additionalInfo,
-//       numberOfRespondents,
-//       location,
-//       requirements
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Task created successfully!",
-//       task,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       error: error.message,
-//     })
-//   }
-// };
-
-// Configure Multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Store files in uploads/ directory
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`); // Unique filenames
-  },
-});
-const upload = multer({ storage });
-
-// Task creation handler
 const createTaskHandler = async (req, res) => {
   try {
+    console.log("Received request:", req.body);
+    console.log("Uploaded files:", req.files);
+
     const {
       title,
       requirements,
@@ -88,55 +17,46 @@ const createTaskHandler = async (req, res) => {
       taskType,
       location,
       link2,
-      additionalInfo, // Fetch additionalInfo directly
+      additionalInfo,
     } = req.body;
 
-    // Validate required fields
-    if (!title || !description || !requirements || !taskType || !location || !deadline) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!title || !description) {
+      return res.status(400).json({ error: "Title and description are required." });
     }
 
-    if (!compensation || typeof compensation !== "object" || !compensation.currency || !compensation.amount) {
-      return res.status(400).json({ error: "Invalid compensation format. It should be an object with currency and amount." });
+    let parsedCompensation;
+    try {
+      parsedCompensation = typeof compensation === "string" ? JSON.parse(compensation) : compensation;
+      if (!parsedCompensation.currency || !parsedCompensation.amount) {
+        return res.status(400).json({ error: "Invalid compensation format." });
+      }
+      parsedCompensation = {
+        currency: parsedCompensation.currency.toUpperCase(),
+        amount: Number(parsedCompensation.amount),
+      };
+    } catch (error) {
+      return res.status(400).json({ error: "Invalid JSON format in compensation." });
     }
-
-    const parsedCompensation = {
-      currency: compensation.currency.toUpperCase(),
-      amount: Number(compensation.amount),
-    };
 
     let additionalInfoArray = [];
 
-    // If a file was uploaded, store it in additionalInfo
-    if (req.file) {
-      additionalInfoArray.push({
-        type: "file",
-        value: `/uploads/${req.file.filename}`,
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        additionalInfoArray.push({ type: "file", value: `/uploads/${file.filename}` });
       });
     }
 
-    // Handle additionalInfo correctly
     if (additionalInfo) {
       try {
-        let parsedAdditionalInfo = additionalInfo;
-
-        // If additionalInfo is a string, parse it
-        if (typeof additionalInfo === "string") {
-          parsedAdditionalInfo = JSON.parse(additionalInfo);
-        }
-
-        // Ensure additionalInfo is an array of objects
-        if (Array.isArray(parsedAdditionalInfo) && parsedAdditionalInfo.every(item => item.type && item.value)) {
+        let parsedAdditionalInfo = JSON.parse(additionalInfo);
+        if (Array.isArray(parsedAdditionalInfo)) {
           additionalInfoArray = [...additionalInfoArray, ...parsedAdditionalInfo];
-        } else {
-          return res.status(400).json({ error: "Invalid additionalInfo format. Must be an array of objects with 'type' and 'value' fields." });
         }
       } catch (error) {
-        return res.status(400).json({ error: "Invalid additionalInfo format. Must be valid JSON." });
+        return res.status(400).json({ error: "Invalid additionalInfo JSON format." });
       }
     }
 
-    // Create the task
     const task = await Task.create({
       title,
       description,
@@ -150,16 +70,9 @@ const createTaskHandler = async (req, res) => {
       requirements,
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Task created successfully!",
-      task,
-    });
+    res.status(201).json({ success: true, message: "Task created successfully!", task });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
@@ -238,6 +151,5 @@ module.exports = {
     createTaskHandler,
     updateTaskHandler,
     deleteTaskHandler,
-    upload,
     getAllTasksHandler,
 }
