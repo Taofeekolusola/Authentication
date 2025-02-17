@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const connectDB = require('./db');
+const connectDB = require('./db')
 const userRoutes = require('./routes/userRoutes');
 const multer = require('multer'); // Add multer
 const taskRoutes = require('./routes/taskRoutes');
