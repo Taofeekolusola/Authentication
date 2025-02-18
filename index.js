@@ -50,7 +50,7 @@ app.use(cookieParser()); // Parse cookies from requests
 
 // Routes
 app.use('/users', userRoutes);
-app.use('/tasks', upload.array('files'), taskRoutes);
+app.use('/tasks', taskRoutes);
 
 // Handle undefined routes
 app.use((req, res) => {

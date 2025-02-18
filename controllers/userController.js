@@ -13,6 +13,14 @@ const SignupHandlerTaskEarner = async (req, res) => {
       return res.status(400).json({ message: "Invalid user details" });
     }
 
+    //valid email dormain address
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format!" });
+    }
+
+    //
+
     const existingUser = await User.findOne({ email }).exec();
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists in the database!" });

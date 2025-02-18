@@ -52,6 +52,10 @@ const TaskSchema = new mongoose.Schema(
         required: true,
       },
     },
+    noOfRespondents: {
+      type: Number,
+      required: true,
+    },
     deadline: {
       type: Date,
       required: true, // Ensure deadline is provided
