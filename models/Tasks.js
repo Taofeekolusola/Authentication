@@ -53,7 +53,7 @@ const TaskSchema = new mongoose.Schema(
       },
     },
     noOfRespondents: {
-      type: Number,
+      type: String,
       required: true,
     },
     deadline: {

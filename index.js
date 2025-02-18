@@ -23,7 +23,8 @@ connectDB();
 
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://altbucks-ipat.vercel.app'
+    'https://altbucks-ipat.vercel.app',
+    'https://authentication-1-bqvg.onrender.com'
 ];
 
 const corsOptions = {
@@ -34,7 +35,7 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,
+    credentials: true,  // This must be set to true for cookies/auth headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
     exposedHeaders: ['set-cookie']
