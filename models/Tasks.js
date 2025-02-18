@@ -38,7 +38,7 @@ const TaskSchema = new mongoose.Schema(
     },
     location: {
       type: String,
-      enum: ["Remote", "On-site"],
+      enum: ["Remote", "Onsite"],
       default: null, // Optional field for location
     },
     compensation: {
