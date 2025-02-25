@@ -1,12 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const connectDB = require('./db')
+const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const multer = require('multer'); // Add multer
 const taskRoutes = require('./routes/taskRoutes');
 require('dotenv').config();
 const session = require('express-session');
+const MongoStore = require('connect-mongo'); // ✅ Use MongoDB for session storage
 
 const app = express();
 
@@ -14,14 +15,6 @@ const app = express();
 connectDB();
 
 // CORS Configuration (Allow Frontend to Access Cookies)
-// const corsOptions = {
-//     origin: process.env.CLIENT_URL || 'http://localhost:3000', // Allow frontend origin
-//     credentials: true, // Allow cookies/auth headers
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-//     exposedHeaders: ['set-cookie'] // Allow frontend to read cookies
-// };
-
 const allowedOrigins = [
     'http://localhost:3000',
     'https://altbucks-ipat.vercel.app',
@@ -36,7 +29,7 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true,  // This must be set to true for cookies/auth headers
+    credentials: true,  // Allow cookies/auth headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
     exposedHeaders: ['set-cookie']
@@ -44,18 +37,24 @@ const corsOptions = {
 
 const upload = multer({ dest: 'uploads/' });
 
-// Session middleware configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || "sessiomsecretcode",
-    resave: false,
-    saveUninitialized: false, // ❌ Fix: Prevent empty sessions from being saved
-    cookie: { 
-        httpOnly: true, // ✅ Helps prevent XSS attacks
-        secure: process.env.NODE_ENV === "production", // ✅ Set `true` in production (HTTPS)
-        sameSite: "Strict", // ✅ Prevents CSRF attacks
-        maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
-    }
-}));
+// ✅ Use MongoDB for session storage
+app.use(
+    session({
+        secret: process.env.SESSION_SECRET || "sessionsecretcode",
+        resave: false,
+        saveUninitialized: false,
+        store: MongoStore.create({
+            mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/mydatabase", // Use MongoDB URL
+            collectionName: "sessions", // Collection to store sessions
+        }),
+        cookie: { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === "production", // Set `true` in production (HTTPS required)
+            sameSite: "Strict",
+            maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
+        }
+    })
+);
 
 // Middleware
 app.use(express.json()); // Parse JSON request body
