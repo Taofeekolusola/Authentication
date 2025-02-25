@@ -329,14 +329,38 @@ const resetPassword = async (req, res) => {
 };
 
 // Get User by Id
+// const getUserProfile = async (req, res) => {
+//   try {
+//     // Check if the user is authenticated
+//     if (!req.session.userId) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+
+//     // Fetch user profile using the ID stored in the session
+//     const userProfile = await User.findById(req.session.userId).select(
+//       "firstName lastName email phoneNumber createdAt"
+//     );
+
+//     if (!userProfile) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     return res.json({ profile: userProfile });
+//   } catch (error) {
+//     console.error("Get user profile error:", error);
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
 const getUserProfile = async (req, res) => {
   try {
-    // Check if the user is authenticated
+    // ✅ Debugging: Check if session is set
+    console.log("Session:", req.session);
+
     if (!req.session.userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Fetch user profile using the ID stored in the session
     const userProfile = await User.findById(req.session.userId).select(
       "firstName lastName email phoneNumber createdAt"
     );
@@ -351,6 +375,7 @@ const getUserProfile = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 module.exports = {
   SignupHandlerTaskCreator,
