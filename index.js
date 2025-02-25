@@ -6,6 +6,7 @@ const userRoutes = require('./routes/userRoutes');
 const multer = require('multer'); // Add multer
 const taskRoutes = require('./routes/taskRoutes');
 require('dotenv').config();
+const session = require('express-session');
 
 const app = express();
 
@@ -42,6 +43,19 @@ const corsOptions = {
 };
 
 const upload = multer({ dest: 'uploads/' });
+
+// Session middleware configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || "sessiomsecretcode",
+    resave: false,
+    saveUninitialized: false, // ❌ Fix: Prevent empty sessions from being saved
+    cookie: { 
+        httpOnly: true, // ✅ Helps prevent XSS attacks
+        secure: process.env.NODE_ENV === "production", // ✅ Set `true` in production (HTTPS)
+        sameSite: "Strict", // ✅ Prevents CSRF attacks
+        maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
+    }
+}));
 
 // Middleware
 app.use(express.json()); // Parse JSON request body

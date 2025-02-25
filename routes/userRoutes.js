@@ -8,7 +8,7 @@ const {
     requestPasswordReset,
     resetPassword,
     verifyResetCode,
-    getUserByIdHandler
+    getUserProfile
 } = require('../controllers/userController');
 
 
@@ -18,8 +18,8 @@ route.post('/login', loginHandler);
 route.post('/verify', verifyResetCode)
 route.post('/reset', resetPassword)
 route.post('/request', requestPasswordReset)
-route.get('/:userId', getUserByIdHandler);
-route.post('/reset', validation, (req, res) => {
+route.get('/user-profile', getUserProfile);
+route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })
 module.exports = route;

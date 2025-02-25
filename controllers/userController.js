@@ -100,14 +100,19 @@ const SignupHandlerTaskCreator = async (req, res) => {
   }
 };
 
-// Login Handler
 // const loginHandler = async (req, res) => {
 //   try {
-//     const { email, password } = req.body;
+//     const { email, password, rememberMe } = req.body;
 
 //     const user = await User.findOne({ email });
 //     if (!user) {
 //       return res.status(401).json({ message: "Invalid email or password" });
+//     }
+
+//     // Validate email format
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ message: "Invalid email format!" });
 //     }
 
 //     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -115,32 +120,32 @@ const SignupHandlerTaskCreator = async (req, res) => {
 //       return res.status(401).json({ message: "Invalid email or password" });
 //     }
 
-//     const token = jwt.sign(
-//       { id: user._id, email: user.email },
-//       process.env.JWT_SECRET,
-//       { expiresIn: '7d' }
-//     );
+//     // Store user session
+//     req.session.userId = user._id;
+//     req.session.email = user.email;
 
-//     return res.status(200).json({ token });
+//     // Set session expiry based on 'rememberMe'
+//     if (rememberMe) {
+//       req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+//     } else {
+//       req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 1 day
+//     }
+
+//     res.json({ message: "Login successful", user: { id: user._id, email: user.email } });
+
 //   } catch (error) {
 //     console.error("Login error:", error);
-//     return res.status(500).json({ message: "Internal server error" });
+//     res.status(500).json({ message: "Internal Server Error" });
 //   }
 // };
 
 const loginHandler = async (req, res) => {
   try {
-    const { email, password, rememberMe } = req.body;
-
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    //valid email dormain address
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format!" });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -148,30 +153,68 @@ const loginHandler = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Set token expiration based on 'rememberMe'
-    const tokenExpiration = rememberMe ? '30d' : '1d'; // 30 days if checked, 1 day otherwise
-    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    // Save user ID in session
+    req.session.userId = user._id;
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: tokenExpiration }
-    );
-
-    // Set cookie based on 'rememberMe'
-    res.cookie("authToken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
-      maxAge: cookieMaxAge, // 30 days or 1 day
+    // Ensure session is saved
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ message: "Internal Server Error" });
+      }
+      res.json({ message: "Login successful" });
     });
-
-    return res.status(200).json({ message: "Login successful" });
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
+// const loginHandler = async (req, res) => {
+//   try {
+//     const { email, password, rememberMe } = req.body;
+
+//     const user = await User.findOne({ email });
+//     if (!user) {
+//       return res.status(401).json({ message: "Invalid email or password" });
+//     }
+
+//     //valid email dormain address
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ message: "Invalid email format!" });
+//     }
+
+//     const isPasswordValid = await bcrypt.compare(password, user.password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({ message: "Invalid email or password" });
+//     }
+
+//     // Set token expiration based on 'rememberMe'
+//     const tokenExpiration = rememberMe ? '30d' : '1d'; // 30 days if checked, 1 day otherwise
+//     const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+//     const token = jwt.sign(
+//       { id: user._id, email: user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: tokenExpiration }
+//     );
+
+//     // Set cookie based on 'rememberMe'
+//     res.cookie("authToken", token, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       sameSite: "Strict",
+//       maxAge: cookieMaxAge, // 30 days or 1 day
+//     });
+
+//     return res.status(200).json({ message: "Login successful" });
+//   } catch (error) {
+//     console.error("Login error:", error);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 
 
 // Send Email Helper Function
@@ -286,20 +329,29 @@ const resetPassword = async (req, res) => {
 };
 
 // Get User by Id
-const getUserByIdHandler = async (req, res) => {
+const getUserProfile = async (req, res) => {
   try {
-    const userId = await User.findById(req.params.id)
+    // Check if the user is authenticated
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-    if (!userId) {
+    // Fetch user profile using the ID stored in the session
+    const userProfile = await User.findById(req.session.userId).select(
+      "firstName lastName email phoneNumber createdAt"
+    );
+
+    if (!userProfile) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    return res.json({ userId });
+    return res.json({ profile: userProfile });
   } catch (error) {
-    console.error("Get user by id error:", error);
+    console.error("Get user profile error:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
-}
+};
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -307,5 +359,5 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   verifyResetCode,
-  getUserByIdHandler
+  getUserProfile
 };
