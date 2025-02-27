@@ -153,23 +153,25 @@ const loginHandler = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Save user ID in session
-    req.session.userId = user._id;
+    // Generate JWT Token
+    const token = jwt.sign(
+      { userId: user._id }, 
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    // Ensure session is saved
-    req.session.save((err) => {
-      if (err) {
-        console.error("Session save error:", err);
-        return res.status(500).json({ message: "Internal Server Error" });
-      }
-      res.json({ message: "Login successful" });
+    res.json({
+      message: "Login successful",
+      token,
     });
+
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
+module.exports = loginHandler;
 
 // const loginHandler = async (req, res) => {
 //   try {
@@ -354,28 +356,27 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    // ✅ Debugging: Check if session is set
-    console.log("Session:", req.session);
+      console.log("🔍 req.user in getUserProfile:", req.user);
 
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+      if (!req.user || !req.user._id || !req.user._id.toString()) {
+          console.log("❌ req.user is missing or invalid");
+          return res.status(401).json({ message: "Unauthorized" });
+      }
 
-    const userProfile = await User.findById(req.session.userId).select(
-      "firstName lastName email phoneNumber createdAt"
-    );
+      const userProfile = await User.findById(req.user._id).select(
+          "firstName lastName email phoneNumber createdAt"
+      );
 
-    if (!userProfile) {
-      return res.status(404).json({ message: "User not found" });
-    }
+      if (!userProfile) {
+          return res.status(404).json({ message: "User not found" });
+      }
 
-    return res.json({ profile: userProfile });
+      return res.json({ profile: userProfile });
   } catch (error) {
-    console.error("Get user profile error:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+      console.error("❌ Get user profile error:", error.message);
+      return res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 module.exports = {
   SignupHandlerTaskCreator,

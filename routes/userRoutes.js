@@ -18,7 +18,7 @@ route.post('/login', loginHandler);
 route.post('/verify', verifyResetCode)
 route.post('/reset', resetPassword)
 route.post('/request', requestPasswordReset)
-route.get('/user-profile', getUserProfile);
+route.get('/user-profile', validation, getUserProfile);
 route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })

@@ -42,23 +42,23 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 
 // ✅ Session Configuration (Use MongoDB for session storage)
-app.use(
-    session({
-        secret: process.env.SESSION_SECRET || "sessionsecretcode",
-        resave: false,
-        saveUninitialized: false,
-        store: MongoStore.create({
-            mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/mydatabase",
-            collectionName: "sessions",
-        }),
-        cookie: { 
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === "production", // ✅ Set `true` in production
-            sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // ✅ Allow cross-origin cookies in production
-            maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
-        }
-    })
-);
+// app.use(
+//     session({
+//         secret: process.env.SESSION_SECRET || "sessionsecretcode",
+//         resave: false,
+//         saveUninitialized: false,
+//         store: MongoStore.create({
+//             mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/mydatabase",
+//             collectionName: "sessions",
+//         }),
+//         cookie: { 
+//             httpOnly: true, 
+//             secure: process.env.NODE_ENV === "production", // ✅ Set `true` in production
+//             sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // ✅ Allow cross-origin cookies in production
+//             maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
+//         }
+//     })
+// );
 
 // ✅ Middleware
 app.use(express.json()); // Parse JSON request body
