@@ -50,10 +50,19 @@ const userSchema = new mongoose.Schema(
     userImageUrl: {
       type: String,
     },
-    cloudinary_id: {
+    cloudinaryId: {
       type: String,
     },
-    userDescription: {
+    bio: {
+      type: String,
+    },
+    expertise: {
+      type: [String],
+    },
+    languages: {
+      type: [String],
+    },
+    location: {
       type: String,
     },
     resetPasswordToken: String,

@@ -3,6 +3,9 @@ const User = require("../models/Users");
 const nodemailer = require('nodemailer');
 const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
+const cloudinary = require('../utils/cloudinary');
+const fs = require('fs');
+const validateArrayFields = require("../utils/validateArrayFields");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -378,6 +381,86 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
+const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
+
+const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const userData = {
+      firstName: req.body.firstName || user.firstName,
+      lastName: req.body.lastName || user.lastName,
+      location: req.body.location || user.location,
+      bio: req.body.bio || user.bio,
+      languages: user.languages,
+      expertise: user.expertise,
+      userImageUrl: user.userImageUrl,
+      cloudinaryId: user.cloudinaryId,
+    };
+
+    try {
+      if (req.body.languages) userData.languages = validateArrayFields(req.body.languages, allowedLanguages);
+      if (req.body.expertise) userData.expertise = validateArrayFields(req.body.expertise, allowedExpertise);
+    } catch (validationError) {
+      return res.status(400).json({ message: validationError.message });
+    }
+
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path);
+        userData.userImageUrl = result.secure_url;
+        userData.cloudinaryId = result.public_id;
+        fs.unlinkSync(req.file.path); // Delete file after successful upload
+      } catch (cloudinaryError) {
+        return res.status(500).json({ message: "Failed to upload image" });
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, userData, { new: true });
+    res.status(200).json({
+      success: true,
+      message: "Successfully updated user profile!",
+      data: { user: updatedUser },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+const changeUserPassword = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const {currentPassword, newPassword, confirmNewPassword} = req.body;
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ message: "Missing Parameters!" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Incorrect Password!" });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ message: "Passwords do not match!" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    return res.status(200).json({ message: "Password has been changed successfully!" });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -385,5 +468,7 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   verifyResetCode,
-  getUserProfile
+  getUserProfile,
+  updateUserProfile,
+  changeUserPassword
 };
