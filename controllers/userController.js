@@ -431,6 +431,36 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
+const changeUserPassword = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const {currentPassword, newPassword, confirmNewPassword} = req.body;
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ message: "Missing Parameters!" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Incorrect Password!" });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ message: "Passwords do not match!" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    return res.status(200).json({ message: "Password has been changed successfully!" });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -439,5 +469,6 @@ module.exports = {
   resetPassword,
   verifyResetCode,
   getUserProfile,
-  updateUserProfile
+  updateUserProfile,
+  changeUserPassword
 };
