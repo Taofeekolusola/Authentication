@@ -1,4 +1,3 @@
-const multer = require("multer");
 const express = require("express");
 const route = express.Router();
 
@@ -8,18 +7,7 @@ const {
   deleteTaskHandler,
   getAllTasksHandler,
 } = require("../controllers/taskController");
-
-// ✅ Define Multer Storage Once
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({ storage });
+const upload = require("../middleware/multer");
 
 // ✅ Use the Correct Middleware
 route.post("/create", upload.array("files", 5), createTaskHandler);

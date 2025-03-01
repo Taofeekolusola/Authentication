@@ -8,9 +8,10 @@ const {
     requestPasswordReset,
     resetPassword,
     verifyResetCode,
-    getUserProfile
+    getUserProfile,
+    updateUserProfile
 } = require('../controllers/userController');
-
+const upload = require("../middleware/multer");
 
 route.post('/create', SignupHandlerTaskCreator);
 route.post('/earn', SignupHandlerTaskEarner);
@@ -19,6 +20,7 @@ route.post('/verify', verifyResetCode)
 route.post('/reset', resetPassword)
 route.post('/request', requestPasswordReset)
 route.get('/user-profile', validation, getUserProfile);
+route.put('/profile', upload.single('avatar'), validation, updateUserProfile)
 route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })
