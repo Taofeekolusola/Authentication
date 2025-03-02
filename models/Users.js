@@ -65,6 +65,14 @@ const userSchema = new mongoose.Schema(
     location: {
       type: String,
     },
+    getNotifiedAboutNewTasks: {
+      type: Boolean,
+      default: false,
+    },
+    receivePaymentConfirmations: {
+      type: Boolean,
+      default: false,
+    },
     resetPasswordToken: String,
     resetPasswordExpiresAt: Date,
     verificationToken: String,

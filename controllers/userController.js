@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const cloudinary = require('../utils/cloudinary');
 const fs = require('fs');
 const validateArrayFields = require("../utils/validateArrayFields");
+const updateModelFields = require("../utils/updatModelFields");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -431,35 +432,53 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-const changeUserPassword = async (req, res) => {
+const changeAccountSettings = async (req, res) => {
   try {
     const userId = req.user._id;
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
-    const {currentPassword, newPassword, confirmNewPassword} = req.body;
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-      return res.status(400).json({ message: "Missing Parameters!" });
+    const allowedUpdates = ["getNotifiedAboutNewTasks", "receivePaymentConfirmations"];
+    const userData = updateModelFields(req.body, allowedUpdates);
+
+    if (currentPassword || newPassword || confirmNewPassword) {
+      const passwordUpdate = await handlePasswordUpdate(userId, currentPassword, newPassword, confirmNewPassword);
+      if (passwordUpdate.error) {
+        return res.status(passwordUpdate.status).json({ message: passwordUpdate.error });
+      }
+      userData.password = passwordUpdate.password;
     }
 
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isPasswordValid) {
-      return res.status(400).json({ message: "Incorrect Password!" });
+    const updatedUser = await User.findByIdAndUpdate(userId, userData, { new: true, runValidators: true });
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
     }
-
-    if (newPassword !== confirmNewPassword) {
-      return res.status(400).json({ message: "Passwords do not match!" });
-    }
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-    return res.status(200).json({ message: "Password has been changed successfully!" });
-  }
-  catch (error) {
+    return res.status(200).json({
+      success: true,
+      message: "Successfully updated account settings!",
+      data: { user: updatedUser },
+    });
+  } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
+const handlePasswordUpdate = async (userId, currentPassword, newPassword, confirmNewPassword) => {
+  if (!currentPassword || !newPassword || !confirmNewPassword) {
+    return { error: "Missing Parameters!", status: 400 };
+  }
+
+  const user = await User.findById(userId).select("+password");
+  if (!user) return { error: "User not found", status: 404 };
+
+  const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isPasswordValid) return { error: "Incorrect Password!", status: 400 };
+
+  if (newPassword !== confirmNewPassword) return { error: "Passwords do not match!", status: 400 };
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  return { password: hashedPassword };
+};
 
 module.exports = {
   SignupHandlerTaskCreator,
@@ -470,5 +489,5 @@ module.exports = {
   verifyResetCode,
   getUserProfile,
   updateUserProfile,
-  changeUserPassword
+  changeAccountSettings
 };
