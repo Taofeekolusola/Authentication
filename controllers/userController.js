@@ -365,7 +365,7 @@ const getUserProfile = async (req, res) => {
       console.log("🔍 req.user in getUserProfile:", req.user);
 
       if (!req.user || !req.user._id || !req.user._id.toString()) {
-          console.log("❌ req.user is missing or invalid");
+          console.log("req.user is missing or invalid");
           return res.status(401).json({ message: "Unauthorized" });
       }
 
@@ -379,7 +379,7 @@ const getUserProfile = async (req, res) => {
 
       return res.json({ profile: userProfile });
   } catch (error) {
-      console.error("❌ Get user profile error:", error.message);
+      console.error("Get user profile error:", error.message);
       return res.status(500).json({ message: "Internal Server Error" });
   }
 };
