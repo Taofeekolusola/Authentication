@@ -7,6 +7,8 @@ const cloudinary = require('../utils/cloudinary');
 const fs = require('fs');
 const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
+const Joi = require("joi");
+const Settings = require("../models/Settings");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -480,6 +482,50 @@ const handlePasswordUpdate = async (userId, currentPassword, newPassword, confir
   return { password: hashedPassword };
 };
 
+const settingsSchema = Joi.object({
+  autoSaveDrafts: Joi.boolean().optional(),
+  soundNotifications: Joi.boolean().optional(),
+  inAppNotifications: Joi.boolean().optional(),
+  smsNotification: Joi.boolean().optional(),
+  emailNotifications: Joi.boolean().optional(),
+  dataSharingPreferences: Joi.boolean().optional(),
+  activityHistory: Joi.boolean().optional(),
+  thirdPartyIntegrations: Joi.boolean().optional(),
+  profileVisibility: Joi.string().valid("public", "private").optional(),
+  nameOnCard: Joi.string().allow(null, "").optional(),
+  cardNumber: Joi.string().creditCard().optional(),
+  cardCvv: Joi.string().pattern(/^\d{3}$/).optional(),
+  cardExpDate: Joi.string().pattern(/^(0[1-9]|1[0-2])\/\d{2}$/).optional(),
+});
+
+const updateUserSettings = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const { error, value } = settingsSchema.validate(req.body, { stripUnknown: true });
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    if (Object.keys(value).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    const updatedSettings = await Settings.findOneAndUpdate(
+      { userId },
+      { $set: value },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Settings updated successfully!",
+      data: updatedSettings,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -489,5 +535,6 @@ module.exports = {
   verifyResetCode,
   getUserProfile,
   updateUserProfile,
-  changeAccountSettings
+  changeAccountSettings,
+  updateUserSettings
 };
