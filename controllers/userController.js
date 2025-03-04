@@ -384,6 +384,17 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const updateUserProfileSchema = Joi.object({
+  firstName: Joi.string().min(2).max(50).optional(),
+  lastName: Joi.string().min(2).max(50).optional(),
+  location: Joi.string()
+    .valid("Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France")
+    .optional(),
+  languages: Joi.string().optional(),
+  expertise: Joi.string().optional(),
+  bio: Joi.string().max(500).optional(),
+});
+
 const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
 const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
 
@@ -392,6 +403,11 @@ const updateUserProfile = async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    const { error } = updateUserProfileSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ message: error.details.map((err) => err.message) });
+    }
 
     const userData = {
       firstName: req.body.firstName || user.firstName,
