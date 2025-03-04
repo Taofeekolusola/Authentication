@@ -10,7 +10,8 @@ const {
     verifyResetCode,
     getUserProfile,
     updateUserProfile,
-    changeAccountSettings
+    changeAccountSettings,
+    updateUserSettings
 } = require('../controllers/userController');
 const upload = require("../middleware/multer");
 
@@ -23,6 +24,7 @@ route.post('/request', requestPasswordReset)
 route.get('/user-profile', validation, getUserProfile);
 route.put('/profile', upload.single('avatar'), validation, updateUserProfile);
 route.put('/account-settings', validation, changeAccountSettings);
+route.patch('/settings', validation, updateUserSettings);
 route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })

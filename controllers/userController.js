@@ -7,6 +7,8 @@ const cloudinary = require('../utils/cloudinary');
 const fs = require('fs');
 const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
+const Joi = require("joi");
+const Settings = require("../models/Settings");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -382,6 +384,17 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const updateUserProfileSchema = Joi.object({
+  firstName: Joi.string().min(2).max(50).optional(),
+  lastName: Joi.string().min(2).max(50).optional(),
+  location: Joi.string()
+    .valid("Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France")
+    .optional(),
+  languages: Joi.string().optional(),
+  expertise: Joi.string().optional(),
+  bio: Joi.string().max(500).optional(),
+});
+
 const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
 const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
 
@@ -390,6 +403,11 @@ const updateUserProfile = async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    const { error } = updateUserProfileSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ message: error.details.map((err) => err.message) });
+    }
 
     const userData = {
       firstName: req.body.firstName || user.firstName,
@@ -480,6 +498,50 @@ const handlePasswordUpdate = async (userId, currentPassword, newPassword, confir
   return { password: hashedPassword };
 };
 
+const settingsSchema = Joi.object({
+  autoSaveDrafts: Joi.boolean().optional(),
+  soundNotifications: Joi.boolean().optional(),
+  inAppNotifications: Joi.boolean().optional(),
+  smsNotification: Joi.boolean().optional(),
+  emailNotifications: Joi.boolean().optional(),
+  dataSharingPreferences: Joi.boolean().optional(),
+  activityHistory: Joi.boolean().optional(),
+  thirdPartyIntegrations: Joi.boolean().optional(),
+  profileVisibility: Joi.string().valid("public", "private").optional(),
+  nameOnCard: Joi.string().allow(null, "").optional(),
+  cardNumber: Joi.string().creditCard().optional(),
+  cardCvv: Joi.string().pattern(/^\d{3}$/).optional(),
+  cardExpDate: Joi.string().pattern(/^(0[1-9]|1[0-2])\/\d{2}$/).optional(),
+});
+
+const updateUserSettings = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const { error, value } = settingsSchema.validate(req.body, { stripUnknown: true });
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    if (Object.keys(value).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    const updatedSettings = await Settings.findOneAndUpdate(
+      { userId },
+      { $set: value },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Settings updated successfully!",
+      data: updatedSettings,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -489,5 +551,6 @@ module.exports = {
   verifyResetCode,
   getUserProfile,
   updateUserProfile,
-  changeAccountSettings
+  changeAccountSettings,
+  updateUserSettings
 };

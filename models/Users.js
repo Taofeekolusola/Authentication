@@ -64,6 +64,7 @@ const userSchema = new mongoose.Schema(
     },
     location: {
       type: String,
+      enum: ["Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France"]
     },
     getNotifiedAboutNewTasks: {
       type: Boolean,
