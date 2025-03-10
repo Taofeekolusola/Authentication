@@ -5,6 +5,8 @@ const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const multer = require('multer');
 const taskRoutes = require('./routes/taskRoutes');
+const paymentRoute = require("./routes/paymentRoute");
+const webhookRoute = require("./routes/webhookRoute");
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -35,6 +37,19 @@ const corsOptions = {
     exposedHeaders: ['set-cookie']
 };
 
+
+// Middleware to parse raw body for the Stripe webhook
+app.use('/api/v1/webhooks/stripe', express.raw({ type: 'application/json' })); // Correctly set content type
+
+// Middleware to add raw body to req object
+app.use('/api/v1/webhooks/stripe', (req, res, next) => {
+    if (req.headers["stripe-signature"]) {
+        req.rawBody = req.body; // Use raw body for signature verification
+    }
+    next();
+});
+
+
 // ✅ Apply CORS Middleware FIRST (before session)
 app.use(cors(corsOptions));
 
@@ -64,9 +79,16 @@ app.use(cookieParser());
 app.use(express.json()); // Parse JSON request body
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/', async (req, res) => {
+    return res.send("Welcome to The Alternative Bucks! API");
+});
+
 // ✅ Routes
 app.use('/users', userRoutes);
 app.use('/tasks', taskRoutes);
+app.use('/api/v1', paymentRoute);
+app.use('/api/v1', webhookRoute);
+
 
 // ✅ Handle undefined routes
 app.use((req, res) => {

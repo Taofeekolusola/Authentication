@@ -169,6 +169,7 @@ const loginHandler = async (req, res) => {
     res.json({
       message: "Login successful",
       token,
+      data: user
     });
 
   } catch (error) {
