@@ -84,6 +84,7 @@ const Task = require("../models/Tasks");
 
 const createTaskHandler = async (req, res) => {
   try {
+    const userId = req.user._id;
     const {
       title,
       requirements,
@@ -147,6 +148,7 @@ const createTaskHandler = async (req, res) => {
     }
 
     const task = await Task.create({
+      userId,
       title,
       description,
       link1,
@@ -237,9 +239,30 @@ const getAllTasksHandler = async (req, res) => {
   }
 };
 
+// Fetch all tasks for logged in task creator handler
+const getTaskCreatorTasksHandler = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const tasks = await Task.find({
+      userId
+    });
+    res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      tasks,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
 module.exports = {
     createTaskHandler,
     updateTaskHandler,
     deleteTaskHandler,
     getAllTasksHandler,
+    getTaskCreatorTasksHandler
 }
