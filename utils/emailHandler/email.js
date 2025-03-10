@@ -6,10 +6,10 @@ dotenv.config();
 async function sendMail(options) {
   try {
     const transporter = nodemailer.createTransport({
-      service: process.env.MAIL_SERVICE,
+      service: process.env.EMAIL_SERVICE,
       auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     // host: process.env.MAIL_SERVICE,
     // port: 587,
@@ -24,7 +24,7 @@ async function sendMail(options) {
     });
 
     const mailOption = {
-      from: process.env.MAIL_USER,
+      from: process.env.EMAIL_USER,
       to: options.email,
       subject: options.subject,
       text: options.text,
