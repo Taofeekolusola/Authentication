@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// Define the schema for additionalInfo
 const AdditionalInfoSchema = new mongoose.Schema(
   {
     type: { type: String, required: true }, // e.g., "file", "url", "image"
@@ -9,17 +8,21 @@ const AdditionalInfoSchema = new mongoose.Schema(
   { _id: false } // Prevents Mongoose from automatically creating an _id for each object
 );
 
-// Define the Task schema
 const TaskSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     title: {
       type: String,
       required: true,
-      trim: true, // Remove leading/trailing spaces
+      trim: true,
     },
     taskType: {
       type: String,
-      required: true, // Ensure task type is provided
+      required: true,
     },
     link1: {
       type: String,
@@ -34,21 +37,21 @@ const TaskSchema = new mongoose.Schema(
     description: {
       type: String,
       required: true,
-      trim: true, // Remove leading/trailing spaces
+      trim: true,
     },
     location: {
       type: String,
       enum: ["Remote", "Onsite"],
-      default: null, // Optional field for location
+      default: null,
     },
     compensation: {
       currency: {
         type: String,
-        enum: ["USD", "EUR"], // Only allow USD or EUR
+        enum: ["USD", "EUR"],
         required: true,
       },
       amount: {
-        type: Number, // Store the numeric value separately
+        type: Number,
         required: true,
       },
     },
@@ -58,19 +61,19 @@ const TaskSchema = new mongoose.Schema(
     },
     deadline: {
       type: Date,
-      required: true, // Ensure deadline is provided
+      required: true,
     },
     requirements: {
       type: String,
-      required: true, // Ensure requirements are provided
+      required: true,
     },
     additionalInfo: {
-      type: [AdditionalInfoSchema], // Use the defined schema for validation
+      type: [AdditionalInfoSchema],
       default: [],
     },
   },
   {
-    timestamps: true, // Automatically handles `createdAt` and `updatedAt`
+    timestamps: true,
   }
 );
 
