@@ -364,27 +364,28 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-      console.log("🔍 req.user in getUserProfile:", req.user);
+    console.log("🔍 req.user in getUserProfile:", req.user);
 
-      if (!req.user || !req.user._id || !req.user._id.toString()) {
-          console.log("req.user is missing or invalid");
-          return res.status(401).json({ message: "Unauthorized" });
-      }
+    if (!req.user || !req.user._id) {
+      console.log("req.user is missing or invalid");
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-      const userProfile = await User.findById(req.user._id).select(
-          "firstName lastName email phoneNumber createdAt"
-      );
+    const userProfile = await User.findById(req.user._id).lean();
 
-      if (!userProfile) {
-          return res.status(404).json({ message: "User not found" });
-      }
+    if (!userProfile) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-      return res.json({ profile: userProfile });
+    const { password, confirmPassword, ...rest } = userProfile;
+
+    return res.status(200).json({ profile: rest });
   } catch (error) {
-      console.error("Get user profile error:", error.message);
-      return res.status(500).json({ message: "Internal Server Error" });
+    console.error("Get user profile error:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 const updateUserProfileSchema = Joi.object({
   firstName: Joi.string().min(2).max(50).optional(),
@@ -435,10 +436,11 @@ const updateUserProfile = async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, userData, { new: true });
+    const { password: _, confirmPassword: __, ...rest } = updatedUser.toObject();
     res.status(200).json({
       success: true,
       message: "Successfully updated user profile!",
-      data: { user: updatedUser },
+      data: { user: rest },
     });
   } catch (error) {
     console.error(error);
