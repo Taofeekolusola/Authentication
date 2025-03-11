@@ -57,10 +57,12 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
     expertise: {
-      type: [String],
+      type: String,
+      enum: ["Web Development", "Content Writing", "DevOps", "UI/UX Design"]
     },
     languages: {
-      type: [String],
+      type: String,
+      enum: ["English", "French", "Spanish", "German", "Chinese"]
     },
     location: {
       type: String,

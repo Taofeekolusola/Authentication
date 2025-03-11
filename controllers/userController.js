@@ -166,10 +166,11 @@ const loginHandler = async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    const { password: _, confirmPassword: __, ...rest } = user.toObject();
     res.json({
       message: "Login successful",
       token,
-      data: user
+      data: rest
     });
 
   } catch (error) {
@@ -391,13 +392,14 @@ const updateUserProfileSchema = Joi.object({
   location: Joi.string()
     .valid("Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France")
     .optional(),
-  languages: Joi.string().optional(),
-  expertise: Joi.string().optional(),
+  languages: Joi.string()
+    .valid("English", "French", "Spanish", "German", "Chinese")
+    .optional(),
+  expertise: Joi.string()
+    .valid("Web Development", "Content Writing", "DevOps", "UI/UX Design")
+    .optional(),
   bio: Joi.string().max(500).optional(),
 });
-
-const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
-const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
 
 const updateUserProfile = async (req, res) => {
   try {
@@ -415,18 +417,11 @@ const updateUserProfile = async (req, res) => {
       lastName: req.body.lastName || user.lastName,
       location: req.body.location || user.location,
       bio: req.body.bio || user.bio,
-      languages: user.languages,
-      expertise: user.expertise,
+      languages: req.body.languages || user.languages,
+      expertise: req.body.expertise || user.expertise,
       userImageUrl: user.userImageUrl,
       cloudinaryId: user.cloudinaryId,
     };
-
-    try {
-      if (req.body.languages) userData.languages = validateArrayFields(req.body.languages, allowedLanguages);
-      if (req.body.expertise) userData.expertise = validateArrayFields(req.body.expertise, allowedExpertise);
-    } catch (validationError) {
-      return res.status(400).json({ message: validationError.message });
-    }
 
     if (req.file) {
       try {
