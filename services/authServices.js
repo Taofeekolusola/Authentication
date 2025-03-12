@@ -42,7 +42,7 @@ const getGoogleUser = async (idToken, accessToken) => {
 
     return data;
   } catch (err) {
-    console.error('Failed to fetch Google Oauth Tokens', err);
+    console.error('Failed to fetch Google user data', err);
     throw new Error(err);
   }
 }
