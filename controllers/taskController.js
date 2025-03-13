@@ -254,24 +254,15 @@ const getAllTasksHandler = async (req, res) => {
 // Fetch all tasks for logged in task creator handler
 const getTaskCreatorTasksHandler = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
     const userId = req.user._id;
 
-    const pageNumber = parseInt(page, 10);
-    const pageSize = parseInt(limit, 10);
-    const skip = (pageNumber - 1) * pageSize;
-
     const tasks = await Task.find({ userId })
-      .skip(skip)
-      .limit(pageSize)
       .sort({ createdAt: -1 });
-    const total = await Task.countDocuments({ userId });
 
     return res.status(200).json({
       success: true,
       message: "Tasks fetched successfully!",
       data: tasks,
-      pagination: paginate(total, page, limit),
     });
   } catch (error) {
     return res.status(500).json({
