@@ -8,6 +8,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const paymentRoute = require("./routes/paymentRoute");
 const webhookRoute = require("./routes/webhookRoute");
 const authRoutes = require("./routes/authRoutes");
+const referralRoutes = require("./routes/referralRoutes");
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -90,6 +91,7 @@ app.use('/tasks', taskRoutes);
 app.use('/api/v1', paymentRoute);
 app.use('/api/v1', webhookRoute);
 app.use('/api/v1/auth', authRoutes);
+app.use("/api/v1/referrals", referralRoutes);
 
 // Handle undefined routes
 app.use((req, res) => {

@@ -76,6 +76,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    referralCode:{
+      type: String,
+      unique: true,
+  },
     resetPasswordToken: String,
     resetPasswordExpiresAt: Date,
     verificationToken: String,
