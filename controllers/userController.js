@@ -9,6 +9,7 @@ const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
 const Joi = require("joi");
 const Settings = require("../models/Settings");
+const { generateAlphanumericCode } = require("../helpers/helpers");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -37,6 +38,7 @@ const SignupHandlerTaskEarner = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const referralCode = generateAlphanumericCode(8);
 
     const newUser = await User.create({
       firstName,
@@ -45,7 +47,8 @@ const SignupHandlerTaskEarner = async (req, res) => {
       lastName,
       phoneNumber,
       isTaskEarner: true,
-      confirmPassword
+      confirmPassword,
+      referralCode,
     });
 
     return res.status(201).json({
@@ -148,7 +151,7 @@ const SignupHandlerTaskCreator = async (req, res) => {
 const loginHandler = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -158,7 +161,15 @@ const loginHandler = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-
+    // Generate referral code if user does not have one
+    if (!user.referralCode) {
+      const referralCode = generateAlphanumericCode(8);
+      user = await User.findOneAndUpdate(
+        { email },
+        { $set: { referralCode } },
+        { new: true }
+      );
+    }
     // Generate JWT Token
     const token = jwt.sign(
       { userId: user._id }, 
@@ -166,10 +177,11 @@ const loginHandler = async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    const { password: _, confirmPassword: __, ...rest } = user.toObject();
     res.json({
       message: "Login successful",
       token,
-      data: user
+      data: rest
     });
 
   } catch (error) {
@@ -363,27 +375,28 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-      console.log("🔍 req.user in getUserProfile:", req.user);
+    console.log("🔍 req.user in getUserProfile:", req.user);
 
-      if (!req.user || !req.user._id || !req.user._id.toString()) {
-          console.log("req.user is missing or invalid");
-          return res.status(401).json({ message: "Unauthorized" });
-      }
+    if (!req.user || !req.user._id) {
+      console.log("req.user is missing or invalid");
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-      const userProfile = await User.findById(req.user._id).select(
-          "firstName lastName email phoneNumber createdAt"
-      );
+    const userProfile = await User.findById(req.user._id).lean();
 
-      if (!userProfile) {
-          return res.status(404).json({ message: "User not found" });
-      }
+    if (!userProfile) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-      return res.json({ profile: userProfile });
+    const { password, confirmPassword, ...rest } = userProfile;
+
+    return res.status(200).json({ profile: rest });
   } catch (error) {
-      console.error("Get user profile error:", error.message);
-      return res.status(500).json({ message: "Internal Server Error" });
+    console.error("Get user profile error:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 const updateUserProfileSchema = Joi.object({
   firstName: Joi.string().min(2).max(50).optional(),
@@ -391,13 +404,14 @@ const updateUserProfileSchema = Joi.object({
   location: Joi.string()
     .valid("Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France")
     .optional(),
-  languages: Joi.string().optional(),
-  expertise: Joi.string().optional(),
+  languages: Joi.string()
+    .valid("English", "French", "Spanish", "German", "Chinese")
+    .optional(),
+  expertise: Joi.string()
+    .valid("Web Development", "Content Writing", "DevOps", "UI/UX Design")
+    .optional(),
   bio: Joi.string().max(500).optional(),
 });
-
-const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
-const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
 
 const updateUserProfile = async (req, res) => {
   try {
@@ -415,18 +429,11 @@ const updateUserProfile = async (req, res) => {
       lastName: req.body.lastName || user.lastName,
       location: req.body.location || user.location,
       bio: req.body.bio || user.bio,
-      languages: user.languages,
-      expertise: user.expertise,
+      languages: req.body.languages || user.languages,
+      expertise: req.body.expertise || user.expertise,
       userImageUrl: user.userImageUrl,
       cloudinaryId: user.cloudinaryId,
     };
-
-    try {
-      if (req.body.languages) userData.languages = validateArrayFields(req.body.languages, allowedLanguages);
-      if (req.body.expertise) userData.expertise = validateArrayFields(req.body.expertise, allowedExpertise);
-    } catch (validationError) {
-      return res.status(400).json({ message: validationError.message });
-    }
 
     if (req.file) {
       try {
@@ -440,10 +447,11 @@ const updateUserProfile = async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, userData, { new: true });
+    const { password: _, confirmPassword: __, ...rest } = updatedUser.toObject();
     res.status(200).json({
       success: true,
       message: "Successfully updated user profile!",
-      data: { user: updatedUser },
+      data: { user: rest },
     });
   } catch (error) {
     console.error(error);

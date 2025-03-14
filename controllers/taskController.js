@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Task = require("../models/Tasks");
+const paginate = require("../utils/paginate");
 
 
 // const createTaskHandler = async (req, res) => {
@@ -84,6 +85,7 @@ const Task = require("../models/Tasks");
 
 const createTaskHandler = async (req, res) => {
   try {
+    const userId = req.user._id;
     const {
       title,
       requirements,
@@ -147,6 +149,7 @@ const createTaskHandler = async (req, res) => {
     }
 
     const task = await Task.create({
+      userId,
       title,
       description,
       link1,
@@ -223,14 +226,46 @@ const deleteTaskHandler = async (req, res) => {
 // Fetch all tasks handler
 const getAllTasksHandler = async (req, res) => {
   try {
-    const tasks = await Task.find({});
-    res.status(200).json({
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const tasks = await Task.find({})
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+    const total = await Task.countDocuments({});
+    
+    return res.status(200).json({
       success: true,
       message: "Tasks fetched successfully!",
-      tasks,
+      data: tasks,
+      pagination: paginate(total, page, limit),
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
+// Fetch all tasks for logged in task creator handler
+const getTaskCreatorTasksHandler = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const tasks = await Task.find({ userId })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+    });
+  } catch (error) {
+    return res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
     })
@@ -242,4 +277,5 @@ module.exports = {
     updateTaskHandler,
     deleteTaskHandler,
     getAllTasksHandler,
+    getTaskCreatorTasksHandler
 }
