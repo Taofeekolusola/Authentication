@@ -2,7 +2,7 @@ const cloudinary = require('../utils/cloudinary');
 const jwt = require("jsonwebtoken");
 const { getGoogleOauthToken, getGoogleUser } = require('../services/authServices');
 const User = require("../models/Users");
-const { generateToken } = require("../helpers/helpers");
+const { generateToken, generateAlphanumericCode } = require("../helpers/helpers");
 
 const googleOauthHandler = async (req, res) => {
   try{
