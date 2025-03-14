@@ -7,6 +7,8 @@ const Wallet = require("../models/walletModel");
 dotenv.config();
 
 
+const FRONTEND_URL = `https://altbucks-ipat.vercel.app`;
+
 class PaymentService {
   constructor() {
     this.flutterwaveAPI = axios.create({
@@ -52,7 +54,7 @@ class PaymentService {
           tx_ref: txRef,
           amount: paymentData.amount,
           currency: paymentData.currency,
-          redirect_url: `${process.env.FRONTEND_URL}/dashboard/my_wallet?ref=${txRef}`,
+          redirect_url: `${FRONTEND_URL}/dashboard/my_wallet?ref=${txRef}`,
         //   payment_options: paymentData.paymentType,
           customer: {
             email: paymentData.userEmail,
@@ -80,8 +82,8 @@ class PaymentService {
             },
           ],
           mode: 'payment',
-          success_url: `${process.env.FRONTEND_URL}/dashboard/my_wallet?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${process.env.FRONTEND_URL}/login`,
+          success_url: `${FRONTEND_URL}/dashboard/my_wallet?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${FRONTEND_URL}/login`,
         });
         return { checkoutUrl: session.url, reference: session.id };
       }
@@ -99,8 +101,8 @@ class PaymentService {
             },
           ],
           application_context: {
-            return_url: `${process.env.FRONTEND_URL}/dashboard/my_wallet`,
-            cancel_url: `${process.env.FRONTEND_URL}/login`,
+            return_url: `${FRONTEND_URL}/dashboard/my_wallet`,
+            cancel_url: `${FRONTEND_URL}/login`,
           },
         });
         const order = await this.paypalClient.execute(request);
@@ -125,8 +127,8 @@ class PaymentService {
         const paymentLinkPayload = {
           quoteId: quoteId,
           description: "Fund wallet",
-          redirect_url: `${process.env.FRONTEND_URL}/dashboard/my_wallet?ref=${quoteId}`, // Success URL
-          cancel_url: `${process.env.FRONTEND_URL}/login`, // Cancel/failure URL
+          redirect_url: `${FRONTEND_URL}/dashboard/my_wallet?ref=${quoteId}`, // Success URL
+          cancel_url: `${FRONTEND_URL}/login`, // Cancel/failure URL
         };
       
         const paymentLinkResponse = await this.wiseAPI.post("/payment-links", paymentLinkPayload);
