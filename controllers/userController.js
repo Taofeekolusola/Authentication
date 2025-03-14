@@ -164,7 +164,11 @@ const loginHandler = async (req, res) => {
     // Generate referral code if user does not have one
     if (!user.referralCode) {
       user.referralCode = generateAlphanumericCode(8);
-      await user.save();
+      user = await User.findOneAndUpdate(
+        { email },
+        { $set: { referralCode } },
+        { new: true }
+      );
     }
     // Generate JWT Token
     const token = jwt.sign(
