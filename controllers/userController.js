@@ -163,7 +163,7 @@ const loginHandler = async (req, res) => {
     }
     // Generate referral code if user does not have one
     if (!user.referralCode) {
-      referralCode = generateAlphanumericCode(8);
+      const referralCode = generateAlphanumericCode(8);
       user = await User.findOneAndUpdate(
         { email },
         { $set: { referralCode } },
