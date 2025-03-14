@@ -22,7 +22,7 @@ const googleOauthHandler = async (req, res) => {
       return res.status(403).json({ message: "Google account not verified" })
     }
 
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "Unregistered email" });
     }
