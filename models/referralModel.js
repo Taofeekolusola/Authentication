@@ -25,14 +25,9 @@ const ReferralSchema = new mongoose.Schema(
         type: Date,
         default: null,
     },
-    status: { 
-        type: String, 
-        enum: ["pending", "successful", "failed"], 
-        default: "pending" 
-    },
   },
   { timestamps: true }
 );
 
-const referralModel = mongoose.model("Referral", ReferralSchema);
-module.exports = referralModel;
+const ReferralModel = mongoose.model("Referral", ReferralSchema);
+module.exports = ReferralModel;

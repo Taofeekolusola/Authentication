@@ -26,7 +26,7 @@ const googleOauthHandler = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Unregistered email" });
     }
-    //Generate referral code if user does not have one
+    // Generate referral code if user does not have one
     if (!user.referralCode) {
       user.referralCode = generateAlphanumericCode(8);
       await user.save();
