@@ -9,6 +9,7 @@ const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
 const Joi = require("joi");
 const Settings = require("../models/Settings");
+const { generateAlphanumericCode } = require("../helpers/helpers");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -37,6 +38,7 @@ const SignupHandlerTaskEarner = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const referralCode = generateAlphanumericCode(8);
 
     const newUser = await User.create({
       firstName,
@@ -45,7 +47,8 @@ const SignupHandlerTaskEarner = async (req, res) => {
       lastName,
       phoneNumber,
       isTaskEarner: true,
-      confirmPassword
+      confirmPassword,
+      referralCode,
     });
 
     return res.status(201).json({
@@ -158,7 +161,11 @@ const loginHandler = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-
+    // Generate referral code if user does not have one
+    if (!user.referralCode) {
+      user.referralCode = generateAlphanumericCode(8);
+      await user.save();
+    }
     // Generate JWT Token
     const token = jwt.sign(
       { userId: user._id }, 

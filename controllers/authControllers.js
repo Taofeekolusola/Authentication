@@ -25,7 +25,12 @@ const googleOauthHandler = async (req, res) => {
     const user = await User.findOne({ email }).lean();
     if (!user) {
       return res.status(404).json({ message: "Unregistered email" });
-    } 
+    }
+    // Generate referral code if user does not have one
+    if (!user.referralCode) {
+      user.referralCode = generateAlphanumericCode(8);
+      await user.save();
+    }
     const token = generateToken({ userId: user._id }, "1d")
 
     const { password: _, confirmPassword: __, ...rest } = user;
