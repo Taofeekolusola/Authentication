@@ -22,22 +22,25 @@ const googleOauthHandler = async (req, res) => {
       return res.status(403).json({ message: "Google account not verified" })
     }
 
-    const user = await User.findOne({ email }).lean();
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "Unregistered email" });
     }
-    // Generate referral code if user does not have one
+    // Generate referral code if missing
     if (!user.referralCode) {
       user.referralCode = generateAlphanumericCode(8);
       await user.save();
     }
-    const token = generateToken({ userId: user._id }, "1d")
 
-    const { password: _, confirmPassword: __, ...rest } = user;
+    const token = generateToken({ userId: user._id }, "1d");
+
+    const userObj = user.toObject();
+    delete userObj.password;
+    delete userObj.confirmPassword;
     res.status(200).json({
       message: "Google OAuth login successful",
       token,
-      data: rest
+      data: userObj
     });
   }
   catch (error) {
