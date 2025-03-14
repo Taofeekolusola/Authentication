@@ -28,7 +28,7 @@ const googleOauthHandler = async (req, res) => {
     }
     // Generate referral code if missing
     if (!user.referralCode) {
-      user.referralCode = generateAlphanumericCode(8);
+      referralCode = generateAlphanumericCode(8);
       user = await User.findOneAndUpdate(
         { email },
         { $set: { referralCode } },
