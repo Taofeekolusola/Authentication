@@ -77,5 +77,40 @@ const TaskSchema = new mongoose.Schema(
   }
 );
 
-// Export the Task model
-module.exports = mongoose.model("Task", TaskSchema);
+const TaskApplicationSchema = new mongoose.Schema(
+  {
+    taskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+      required: true,
+    },
+    earnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    earnerStatus: {
+      type: String,
+      enum: ["cancelled", "pending", "completed"],
+      default: "pending",
+    },
+    creatorStatus: {
+      type: String,
+      enum: ["approved", "pending"],
+      default: "pending",
+    },
+    submittedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { timestamps: true }
+);
+
+const Task = mongoose.model("Task", TaskSchema);
+const TaskApplication = mongoose.model("TaskApplication", TaskApplicationSchema);
+module.exports = { Task, TaskApplication };
