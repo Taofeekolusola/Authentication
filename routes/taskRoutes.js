@@ -26,5 +26,4 @@ route.post("/:taskId/applications", validation, isTaskEarner, createTaskApplicat
 route.patch("/:taskId/applications/:appId/status", validation, isTaskEarner, isApplicationOwner, updateEarnerStatus);
 route.patch("/:taskId/applications/:appId/review", validation, isTaskCreator, isTaskOwner, updateReviewStatus);
 
-
 module.exports = route;

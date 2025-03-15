@@ -3,11 +3,16 @@ const { TaskApplication } = require("../models/Tasks");
 const isTaskOwner = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const taskApplicationId = req.params.appId;
-    const taskApplication = await TaskApplication.findById(taskApplicationId).populate({
+    const { appId, taskId } = req.params;
+    const taskApplication = await TaskApplication.findOne(
+      { _id :appId, taskId }
+    ).populate({
       path: "taskId",
       select: "userId",
     });
+    if (!taskApplication) {
+      return res.status(404).json({ message: 'Task application not found' });
+    }
     if (taskApplication.taskId.userId !== userId) {
         return res.status(401).json({ message: 'Not owner of Task' });
     }
