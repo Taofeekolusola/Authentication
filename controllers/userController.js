@@ -5,7 +5,6 @@ const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
 const cloudinary = require('../utils/cloudinary');
 const fs = require('fs');
-const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
 const Joi = require("joi");
 const Settings = require("../models/Settings");
