@@ -4,6 +4,7 @@ const Users = require("../models/Users");
 const { sendReferralEmail } = require("../utils/emailHandler/emailReferral");
 const { generateReferralEmailTemplate } = require("../utils/emailHandler/referralMail");
 const paginate = require("../utils/paginate");
+require("dotenv").config()
 
 const sendReferralInviteSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -44,7 +45,7 @@ const sendReferralInvite = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    res.status(200).json({
+    res.status(201).json({
       success:true,
       message:"Referral invite sent!",
       data: {
@@ -108,7 +109,62 @@ const getReferralList = async (req, res) => {
   }
 }
 
+const getReferralLink = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await Users.findById(userId);
+    let referralCode = user.referralCode;
+    if (!referralCode) {
+      return res.status(400).json({ status: false, message: "Please log out and log back in" });
+    }
+    const referralLink = `${process.env.FRONTEND_SIGN_UP_TASK_EARNER_URL}?referralCode=${referralCode}`;
+    res.status(200).json({
+      success:true,
+      message:"Referral link retrieved successfully!",
+      data: { referralLink },
+    })
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  } 
+}
+
+const getReferralStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const rewardPerReferral = parseInt(process.env.REWARD_PER_REFERRAL, 10);
+    const totalAcceptedReferrals = await ReferralModel.countDocuments({
+      earnerId: userId,
+      status: "accepted",
+    });
+    console.log(totalAcceptedReferrals)
+
+    const totalPendingReferrals = await ReferralModel.countDocuments({
+      earnerId: userId,
+      status: "pending",
+    });
+    console.log(totalPendingReferrals)
+
+    res.status(200).json({
+      success:true,
+      message:"Referral stats retrieved successfully!",
+      data: {
+        totalReferrals: totalAcceptedReferrals,
+        pendingRewards: totalPendingReferrals * rewardPerReferral,
+        earnedRewards: totalAcceptedReferrals * rewardPerReferral,
+      },
+    })
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   sendReferralInvite,
   getReferralList,
+  getReferralLink,
+  getReferralStats,
 }
