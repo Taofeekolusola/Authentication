@@ -172,7 +172,7 @@ const loginHandler = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
     // Generate referral code if user does not have one
-    if (!user.referralCode) {
+    if (!user.referralCode && user.isTaskEarner) {
       const referralCode = generateAlphanumericCode(8);
       user = await User.findOneAndUpdate(
         { email },
