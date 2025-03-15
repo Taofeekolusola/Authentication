@@ -17,10 +17,6 @@ const ReferralSchema = new mongoose.Schema(
         default: "pending",
         required: true,
     },
-    sentAt: {
-        type: Date,
-        default: null,
-    },
     acceptedAt: {
         type: Date,
         default: null,

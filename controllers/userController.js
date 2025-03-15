@@ -9,10 +9,11 @@ const updateModelFields = require("../utils/updatModelFields");
 const Joi = require("joi");
 const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
+const ReferralModel = require("../models/referralModel");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
-  const { firstName, email, password, lastName, phoneNumber, confirmPassword } = req.body;
+  const { firstName, email, password, lastName, phoneNumber, confirmPassword, referralCode } = req.body;
 
   try {
     if (!firstName || !email || !password || !lastName || !phoneNumber || !confirmPassword) {
@@ -25,8 +26,6 @@ const SignupHandlerTaskEarner = async (req, res) => {
       return res.status(400).json({ message: "Invalid email format!" });
     }
 
-    //
-
     const existingUser = await User.findOne({ email }).exec();
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists in the database!" });
@@ -37,7 +36,18 @@ const SignupHandlerTaskEarner = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const referralCode = generateAlphanumericCode(8);
+    const userReferralCode = generateAlphanumericCode(8);
+    let referral = {}
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode }).lean();
+      if (referrer) {
+        referral = await ReferralModel.findOneAndUpdate(
+          { earnerId: referrer._id, email },
+          { status: "accepted", acceptedAt: new Date() },
+          { new: true, upsert: true }
+        )
+      } 
+    }
 
     const newUser = await User.create({
       firstName,
@@ -47,13 +57,14 @@ const SignupHandlerTaskEarner = async (req, res) => {
       phoneNumber,
       isTaskEarner: true,
       confirmPassword,
-      referralCode,
+      referralCode: userReferralCode,
     });
 
     return res.status(201).json({
       success: true,
       message: "Task Earner created!",
-      newUser
+      newUser,
+      referral,
     });
   } catch (error) {
     console.error("Signup error:", error);
