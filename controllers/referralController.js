@@ -40,7 +40,7 @@ const sendReferralInvite = async (req, res) => {
 
     let referral = await ReferralModel.findOneAndUpdate(
       { email, earnerId: userId },
-      { sentAt: new Date(), status: "pending" },
+      { status: "pending" },
       { new: true, upsert: true }
     );
 
@@ -82,9 +82,9 @@ const getReferralList = async (req, res) => {
 
     if (status) query.status = status;
     if (fromDate || toDate) {
-      query.sentAt = {};
-      if (fromDate) query.sentAt.$gte = new Date(fromDate);
-      if (toDate) query.sentAt.$lte = new Date(toDate);
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) query.createdAt.$lte = new Date(toDate);
     }
 
     const [referrals, total] = await Promise.all([
