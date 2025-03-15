@@ -94,9 +94,9 @@ const TaskApplicationSchema = new mongoose.Schema(
       enum: ["cancelled", "pending", "completed"],
       default: "pending",
     },
-    creatorStatus: {
+    reviewStatus: {
       type: String,
-      enum: ["approved", "pending"],
+      enum: ["approved", "pending", "rejected"],
       default: "pending",
     },
     submittedAt: {
@@ -104,6 +104,10 @@ const TaskApplicationSchema = new mongoose.Schema(
       default: null,
     },
     reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
       type: Date,
       default: null,
     },
