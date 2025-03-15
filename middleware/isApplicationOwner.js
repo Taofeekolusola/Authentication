@@ -11,7 +11,7 @@ const isApplicationOwner = async (req, res, next) => {
       return res.status(404).json({ message: 'Task application not found' });
     }
     if (taskApplication.earnerId.toString() !== userId.toString()) {
-        return res.status(401).json({ message: 'Not owner of Task Application' });
+        return res.status(403).json({ message: 'Not owner of Task Application' });
     }
     next();
   }
