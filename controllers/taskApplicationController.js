@@ -12,7 +12,7 @@ const createTaskApplication = async (req, res) => {
 
     // Check that task respondents hasn't been exceeded
     const numberOfApplications = await TaskApplication.countDocuments({ taskId });
-    if (numberOfApplications === task.noOfRespondents) {
+    if (numberOfApplications >= parseInt(task.noOfRespondents, 10)) {
       return res.status(400).json({ message: "Application limit exceeded" });
     }
 
@@ -44,22 +44,24 @@ const updateEarnerStatusSchema = Joi.object({
 
 const updateEarnerStatus = async (req, res) => {
   try{
-    const { taskId, appId } = req.params;
+    const { appId } = req.params;
     const earnerId = req.user._id;
     const { earnerStatus } = req.body;
 
-    // Validate request body
     const { error } = updateEarnerStatusSchema.validate({ earnerStatus });
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
     let taskApplication = await TaskApplication.findOne({ _id: appId, earnerId }).lean();
+
+    // Restrict update if task creator has reviewed
     if (taskApplication.reviewStatus !== "pending") {
       return res.status(400).json({
         success: false, message: "Task has already been reviewed"
       });
     }
+
     const updateFields = { earnerStatus };
     if (earnerStatus === "completed") {
       updateFields.submittedAt = new Date();
@@ -89,7 +91,7 @@ const updateEarnerStatus = async (req, res) => {
 }
 
 const updateReviewStatusSchema = Joi.object({
-  creatorStatus: Joi.string()
+  reviewStatus: Joi.string()
     .valid("approved", "pending", "rejected")
     .required(),
 });
@@ -98,20 +100,22 @@ const updateReviewStatus = async (req, res) => {
     const { taskId, appId } = req.params;
     const { reviewStatus } = req.body;
 
-    const { error } = updateReviewStatusSchema.validate({ creatorStatus });
+    const { error } = updateReviewStatusSchema.validate({ reviewStatus });
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
     let taskApplication = await TaskApplication.findOne({ _id: appId, taskId }).lean();
+
+    // Restrict update if task earner has not set task to completed
     if (taskApplication.earnerStatus !== "completed") {
       return res.status(400).json({
         success: false, message: "Task is not yet completed"
       });
     }
 
-    const updateFields = { creatorStatus };
-    if (creatorStatus === "pending") {
+    const updateFields = { reviewStatus };
+    if (reviewStatus === "pending") {
       updateFields.reviewedAt = null;
     } else {
       updateFields.reviewedAt = new Date();
