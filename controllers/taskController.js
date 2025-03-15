@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Task = require("../models/Tasks");
+const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
 
 
