@@ -139,8 +139,60 @@ const updateReviewStatus = async (req, res) => {
   }
 }
 
+const fetchAllApplicationsEarnerSchema = Joi.object({
+
+});
+const fetchAllApplicationsEarner = async (req, res) => {
+  try{
+    const { taskId, appId } = req.params;
+    const { reviewStatus } = req.body;
+
+    const { error } = fetchAllApplicationsCreatorSchema.validate({ reviewStatus });
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "",
+      data: "",
+    });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+const fetchAllApplicationsCreatorSchema = Joi.object({
+
+});
+const fetchAllApplicationsCreator = async (req, res) => {
+  try{
+    const { taskId, appId } = req.params;
+    const { reviewStatus } = req.body;
+
+    const { error } = fetchAllApplicationsCreatorSchema.validate({ reviewStatus });
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "",
+      data: "",
+    });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   createTaskApplication,
   updateEarnerStatus,
   updateReviewStatus,
+  fetchAllApplicationsCreator,
+  fetchAllApplicationsEarner,
 }

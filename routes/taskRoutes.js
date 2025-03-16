@@ -22,8 +22,22 @@ route.get("/all", validation, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
 
 // Task Applications
+
+// Apply for a task (earner)
 route.post("/:taskId/applications", validation, isTaskEarner, createTaskApplication);
+
+// Update the status of a task (earner)
 route.patch("/:taskId/applications/:appId/status", validation, isTaskEarner, isApplicationOwner, updateEarnerStatus);
+
+// Update the review status of a task (creator)
+// Note: This only works when task has been set to completed by earner
 route.patch("/:taskId/applications/:appId/review", validation, isTaskCreator, isTaskOwner, updateReviewStatus);
+
+// Get all task applications for a earner
+route.get("/applications/earner", validation, isTaskEarner,)
+
+//Get all task applications for a creator
+route.get("/applications/creator", validation, isTaskCreator,)
+
 
 module.exports = route;
