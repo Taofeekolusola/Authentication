@@ -91,13 +91,13 @@ const TaskApplicationSchema = new mongoose.Schema(
     },
     earnerStatus: {
       type: String,
-      enum: ["cancelled", "pending", "completed"],
-      default: "pending",
+      enum: ["Cancelled", "In Progress", "Pending", "Completed"],
+      default: "In Progress",
     },
     reviewStatus: {
       type: String,
-      enum: ["approved", "pending", "rejected"],
-      default: "pending",
+      enum: ["Approved", "Pending", "Rejected"],
+      default: "Pending",
     },
     submittedAt: {
       type: Date,

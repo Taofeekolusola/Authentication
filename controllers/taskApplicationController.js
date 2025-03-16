@@ -38,7 +38,7 @@ const createTaskApplication = async (req, res) => {
 
 const updateEarnerStatusSchema = Joi.object({
   earnerStatus: Joi.string()
-    .valid("cancelled", "pending", "completed")
+    .valid("Cancelled", "In Progress", "Pending", "Completed")
     .required(),
 });
 
@@ -56,20 +56,20 @@ const updateEarnerStatus = async (req, res) => {
     let taskApplication = await TaskApplication.findOne({ _id: appId, earnerId }).lean();
 
     // Restrict update if task creator has reviewed
-    if (taskApplication.reviewStatus !== "pending") {
+    if (taskApplication.reviewStatus !== "Pending") {
       return res.status(400).json({
         success: false, message: "Task has already been reviewed"
       });
     }
 
     const updateFields = { earnerStatus };
-    if (earnerStatus === "completed") {
+    if (earnerStatus === "Completed") {
       updateFields.submittedAt = new Date();
       updateFields.cancelledAt = null;
-    } else if (earnerStatus === "cancelled") {
+    } else if (earnerStatus === "Cancelled") {
       updateFields.cancelledAt = new Date();
       updateFields.submittedAt = null;
-    } else if (earnerStatus === "pending") {
+    } else if (earnerStatus === "Pending" || earnerStatus === "In Progress") {
       updateFields.submittedAt = null;
       updateFields.cancelledAt = null;
     }
@@ -92,7 +92,7 @@ const updateEarnerStatus = async (req, res) => {
 
 const updateReviewStatusSchema = Joi.object({
   reviewStatus: Joi.string()
-    .valid("approved", "pending", "rejected")
+    .valid("Approved", "Pending", "Rejected")
     .required(),
 });
 const updateReviewStatus = async (req, res) => {
@@ -108,14 +108,14 @@ const updateReviewStatus = async (req, res) => {
     let taskApplication = await TaskApplication.findOne({ _id: appId, taskId }).lean();
 
     // Restrict update if task earner has not set task to completed
-    if (taskApplication.earnerStatus !== "completed") {
+    if (taskApplication.earnerStatus !== "Completed") {
       return res.status(400).json({
         success: false, message: "Task is not yet completed"
       });
     }
 
     const updateFields = { reviewStatus };
-    if (reviewStatus === "pending") {
+    if (reviewStatus === "Pending") {
       updateFields.reviewedAt = null;
     } else {
       updateFields.reviewedAt = new Date();
