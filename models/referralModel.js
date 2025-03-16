@@ -2,24 +2,29 @@ const mongoose = require("mongoose");
 
 const ReferralSchema = new mongoose.Schema(
   {
-    earnerId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
+    referrerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
-    email:{
-        type: String,
+    refereeId: {
+      type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         required: false,
     },
+    email:{
+      type: String,
+      required: true,
+    },
     status: {
-        type: String,
-        enum: ["pending", "accepted", "cancelled"],
-        default: "pending",
-        required: true,
+      type: String,
+      enum: ["Invite pending", "Invite accepted", "Invite cancelled"],
+      default: "Invite pending",
+      required: true,
     },
     acceptedAt: {
-        type: Date,
-        default: null,
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }

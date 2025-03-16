@@ -37,17 +37,6 @@ const SignupHandlerTaskEarner = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const userReferralCode = generateAlphanumericCode(8);
-    let referral = {}
-    if (referralCode) {
-      const referrer = await User.findOne({ referralCode }).lean();
-      if (referrer) {
-        referral = await ReferralModel.findOneAndUpdate(
-          { earnerId: referrer._id, email },
-          { status: "accepted", acceptedAt: new Date() },
-          { new: true, upsert: true }
-        )
-      } 
-    }
 
     const newUser = await User.create({
       firstName,
@@ -59,6 +48,18 @@ const SignupHandlerTaskEarner = async (req, res) => {
       confirmPassword,
       referralCode: userReferralCode,
     });
+
+    let referral = {}
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode }).lean();
+      if (referrer) {
+        referral = await ReferralModel.findOneAndUpdate(
+          { referrerId: referrer._id, email },
+          { status: "Invite accepted", acceptedAt: new Date(), refereeId: newUser._id },
+          { new: true, upsert: true }
+        )
+      } 
+    }
 
     return res.status(201).json({
       success: true,
