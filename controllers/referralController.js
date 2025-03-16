@@ -40,8 +40,8 @@ const sendReferralInvite = async (req, res) => {
     await sendReferralEmail(email, referralMailSubject, emailHTML);
 
     let referral = await ReferralModel.findOneAndUpdate(
-      { email, earnerId: userId },
-      { status: "pending" },
+      { email, referrerId: userId },
+      { status: "Invite pending" },
       { new: true, upsert: true }
     );
 
@@ -60,7 +60,7 @@ const sendReferralInvite = async (req, res) => {
 }
 
 const referralListSchema = Joi.object({
-  status: Joi.string().valid("pending", "accepted", "cancelled"),
+  status: Joi.string().valid("Invite pending", "Invite accepted", "Invite cancelled"),
   fromDate: Joi.date().iso().messages({ "date.format": "fromDate must be in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)" }),
   toDate: Joi.date().iso().messages({ "date.format": "toDate must be in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)" }),
   page: Joi.number().integer().min(1).default(1),
@@ -73,13 +73,14 @@ const getReferralList = async (req, res) => {
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
+    const referrerId = req.user._id;
     const { status, fromDate, toDate, page = 1, limit = 10 } = value
 
     const pageNumber = parseInt(page, 10);
     const pageSize = parseInt(limit, 10);
     const skip = (pageNumber - 1) * pageSize;
 
-    const query = {};
+    const query = {referrerId};
 
     if (status) query.status = status;
     if (fromDate || toDate) {
@@ -92,7 +93,9 @@ const getReferralList = async (req, res) => {
       ReferralModel.find(query)
         .skip(skip)
         .limit(pageSize)
-        .sort({ createdAt: -1 }),
+        .sort({ createdAt: -1 })
+        .populate("refereeId", "firstName lastName userImageUrl")
+        .lean(),
       ReferralModel.countDocuments(query),
     ]);
 
@@ -135,16 +138,14 @@ const getReferralStats = async (req, res) => {
     const userId = req.user._id;
     const rewardPerReferral = parseInt(process.env.REWARD_PER_REFERRAL, 10);
     const totalAcceptedReferrals = await ReferralModel.countDocuments({
-      earnerId: userId,
-      status: "accepted",
+      referrerId: userId,
+      status: "Invite accepted",
     });
-    console.log(totalAcceptedReferrals)
 
     const totalPendingReferrals = await ReferralModel.countDocuments({
-      earnerId: userId,
-      status: "pending",
+      referrerId: userId,
+      status: "Invite pending",
     });
-    console.log(totalPendingReferrals)
 
     res.status(200).json({
       success:true,
