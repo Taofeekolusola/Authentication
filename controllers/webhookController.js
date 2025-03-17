@@ -272,11 +272,7 @@ const handleChargeSuccess = async (data, gateway) => {
     const emailBody = `Payment of ${paymentRecord.amount} ${paymentRecord.currency} was successful. Reference: ${paymentRecord.reference}. \n\n AltBucks`;
     const recipient = paymentRecord.email;
     if (recipient && typeof recipient === "string") {
-      const emailHTML = generateEmailTemplate({
-        subject: "Payment Successful",
-        name: recipient,
-        body: emailBody,
-      });
+      const emailHTML = generateEmailTemplate("Payment Successful", recipient, emailBody);
       await sendEmailNotification(recipient, "Payment Successful", emailHTML);
       await notificationModel.create({
         email: paymentRecord.email,
@@ -309,11 +305,7 @@ const handleChargeFailed = async (data, gateway) => {
     const emailBody = `Payment of ${paymentRecord.amount} ${paymentRecord.currency} failed. Reference: ${paymentRecord.reference}. \n\n AltBucks`;
     const recipient = paymentRecord.email;
     if (recipient && typeof recipient === "string") {
-      const emailHTML = generateEmailTemplate({
-        subject: "Payment Failed",
-        name: recipient,
-        body: emailBody,
-      });
+      const emailHTML = generateEmailTemplate("Payment Failed", recipient, emailBody);
       await sendEmailNotification(recipient, "Payment Failed", emailHTML);
       await notificationModel.create({
         email: paymentRecord.email,
@@ -351,11 +343,7 @@ const handleTransferSuccess = async (data, gateway) => {
     const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} to ${transferRecord.recipient_name} was successful. Reference: ${transferRecord.reference}. \n\n Your Team`;
     const recipient = transferRecord.email;
     if (recipient && typeof recipient === "string") {
-      const emailHTML = generateEmailTemplate({
-        subject: "Transfer Successful",
-        name: recipient,
-        body: emailBody,
-      });
+      const emailHTML = generateEmailTemplate("Transfer Successful", recipient, emailBody);
       await sendEmailNotification(recipient, "Transfer Successful", emailHTML);
       await notificationModel.create({
         email: transferRecord.email,
@@ -388,11 +376,7 @@ const handleTransferFailed = async (data, gateway) => {
     const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} to ${transferRecord.recipient_name} failed. Reference: ${transferRecord.reference}. \n\n Your Team`;
     const recipient = transferRecord.email;
     if (recipient && typeof recipient === "string") {
-      const emailHTML = generateEmailTemplate({
-        subject: "Transfer Failed",
-        name: recipient,
-        body: emailBody,
-      });
+      const emailHTML = generateEmailTemplate("Transfer Failed", recipient, emailBody);
       await sendEmailNotification(recipient, "Transfer Failed", emailHTML);
       await notificationModel.create({
         email: transferRecord.email,

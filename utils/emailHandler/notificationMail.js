@@ -82,7 +82,7 @@ const generateEmailTemplate = (subject, name, body) => {
  <center style="width: 100%;">
     <div class="email-container">
         <div class="email-header">
-            <img src="https://res.cloudinary.com/dl4xukuf1/image/upload/v1739852891/Group_39230_mbcdwf.webp" alt="altBucks_Logo">
+            <img src="https://res.cloudinary.com/dx6qmw7w9/image/upload/v1742221817/AltBucks_Logo_a2xq7v.png" alt="altBucks_Logo">
         </div>
         <div class="email-content">
             <h1>${subject}</h1>

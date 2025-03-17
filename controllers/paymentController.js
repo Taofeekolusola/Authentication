@@ -55,7 +55,7 @@ const getWalletBalance = async (req, res) => {
       return res.status(401).json({ message: "User not logged in" });
     }
 
-    const walletBalance = await WalletService.getWalletById(userId);
+    const walletBalance = await WalletService.getWalletByField({userId: userId});
     if (!walletBalance) return res.status(404).json({ message: "Wallet not found" });
 
     return res.status(200).json({ balance: walletBalance.balance });
@@ -72,7 +72,7 @@ const getWalletDetails = async (req, res) => {
       return res.status(401).json({ message: "User not logged in" });
     }
 
-    const wallet = await WalletService.getWalletById(userId);
+    const wallet =  await WalletService.getWalletByField({userId: userId});
     if (!wallet) return res.status(404).json({ message: "Wallet not found" });
 
     return res.status(200).json({ details: wallet });
