@@ -1,97 +1,242 @@
-import Task from "../models/task.model.js";
-import User from "../models/users.model.js"
+const mongoose = require("mongoose");
+const  Task  = require("../models/Tasks");
+const paginate = require("../utils/paginate");
 
 
-//Create Task
-export const createTask = async (req, res) => {
+const createTaskHandler = async (req, res) => {
   try {
-    const { title, description, budget, createdBy } = req.body;
+    console.log("Raw request body:", req.body);
 
 
-    // Validate required fields
-    if (!title || !description || !budget || !createdBy) {
-      return res.status(400).json({ error: "All fields are required." });
+    const {
+      title,
+      requirements,
+      description,
+      compensation,
+      noOfRespondents,
+      deadline,
+      link1,
+      taskType,
+      location,
+      link2,
+      additionalInfo, // Could be undefined
+    } = req.body;
+
+
+    if (!title || !description || !requirements || !deadline || !compensation || !taskType || !location) {
+      return res.status(400).json({ error: "Missing required field." });
     }
 
 
-    // Check if User exists
-    const user = await User.findById(createdBy);
-    if (!user) {
-      return res.status(404).json({ error: "User not found." });
+    let parsedCompensation;
+    try {
+      parsedCompensation = typeof compensation === "string" ? JSON.parse(compensation) : compensation;
+      if (!parsedCompensation.currency || !parsedCompensation.amount) {
+        return res.status(400).json({ error: "Invalid compensation format." });
+      }
+      parsedCompensation = {
+        currency: parsedCompensation.currency.toUpperCase(),
+        amount: Number(parsedCompensation.amount),
+      };
+    } catch (error) {
+      return res.status(400).json({ error: "Invalid JSON format in compensation." });
     }
 
 
-    // Create Task
-    const task = new Task({ title, description, budget, createdBy });
-    await task.save();
+    let additionalInfoArray = [];
 
 
-    res.status(201).json({ message: "Task created successfully", task });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-
-// Fetch all tasks
-export const getAllTasks = async (req, res) => {
-  try {
-    const tasks = await Task.find().populate("createdBy", "name email");
-    res.json({ status: "SUCCESS", tasks });
-  } catch (error) {
-    res.status(500).json({ status: "FAILED", message: error.message });
-  }
-};
-
-
-// Search tasks
-export const searchTasks = async (req, res) => {
-  try {
-    const { query } = req.query; // Get the search query
-
-    if (!query) {
-      return res.status(400).json({ status: "FAILED", message: "Search query is required" });
+    // Handle uploaded files
+    if (req.files && req.files.length > 0) {
+      additionalInfoArray.push(...req.files.map(file => ({ type: "file", value: `/uploads/${file.filename}` })));
     }
 
-    // Perform search (case insensitive)
-    const tasks = await Task.find({
-      $or: [
-        { title: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } }
-      ]
+
+    // Debugging: Log received `additionalInfo`
+    console.log("Raw additionalInfo:", additionalInfo);
+
+
+    // Parse `additionalInfo` safely
+    if (additionalInfo) {
+      try {
+        // Ensure additionalInfo is an array
+        const parsedAdditionalInfo = typeof additionalInfo === "string" ? JSON.parse(additionalInfo) : additionalInfo;
+        if (Array.isArray(parsedAdditionalInfo)) {
+          additionalInfoArray.push(...parsedAdditionalInfo);
+        } else {
+          return res.status(400).json({ error: "additionalInfo must be an array." });
+        }
+      } catch (error) {
+        return res.status(400).json({ error: "Invalid JSON format in additionalInfo." });
+      }
+    }
+
+
+    if (!additionalInfoArray.length) {
+      additionalInfoArray = [{ type: "note", value: "No additional info provided" }];
+    }
+
+
+    const task = await Task.create({
+      userId: req.user._id,
+      title,
+      description,
+      link1,
+      taskType,
+      deadline,
+      noOfRespondents,
+      compensation: parsedCompensation,
+      link2,
+      additionalInfo: additionalInfoArray,
+      location,
+      requirements,
     });
 
-    if (tasks.length === 0) {
-      return res.status(404).json({ status: "FAILED", message: "No tasks found" });
-    }
 
-    res.status(200).json({ status: "SUCCESS", data: tasks });
+    res.status(201).json({ success: true, message: "Task created successfully!", task });
+
 
   } catch (error) {
-    res.status(500).json({ status: "FAILED", message: "Error searching tasks", error: error.message });
+    console.error("Error creating task:", error.message);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
 
-
-// Update task status
-export const updateTaskStatus = async (req, res) => {
+// Update Task Handler
+const updateTaskHandler = async (req, res) => {
+  const { taskId } = req.params;
+  const updatedData = req.body;
   try {
-    const { taskId } = req.params;
-    const { status } = req.body;
-
-
-    if (!["pending", "in_progress", "completed"].includes(status)) {
-      return res.status(400).json({ status: "FAILED", message: "Invalid status" });
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      res.status.json(400).json("Invalid Task ID");
     }
 
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json("Task not found");
+    }
 
-    const task = await Task.findByIdAndUpdate(taskId, { status }, { new: true });
-    if (!task) return res.status(404).json({ status: "FAILED", message: "Task not found" });
-
-
-    res.json({ status: "SUCCESS", task });
+    await task.updateOne(updatedData);
+    res.status(200).json({
+      success: true,
+      message: "Task updated successfully!",
+      task: { ...task.toObject(), ...updatedData },
+    });
   } catch (error) {
-    res.status(500).json({ status: "FAILED", message: error.message });
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
   }
 };
+
+// Delete Task Handler
+const deleteTaskHandler = async (req, res) => {
+  const { taskId } = req.params;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      res.status(400).json("Invalid Task ID");
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      res.status(404).json("Task not found");
+    }
+
+    await task.deleteOne();
+    res.status(200).json({
+      success: true,
+      message: "Task deleted successfully!",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
+// Fetch all tasks handler
+const getAllTasksHandler = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const tasks = await Task.find({})
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+    const total = await Task.countDocuments({});
+    
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+      pagination: paginate(total, page, limit),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
+// Fetch all tasks for logged in task creator handler
+const getTaskCreatorTasksHandler = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const tasks = await Task.find({ userId })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
+// Search Tasks Route
+const searchTasksHandler = async (req, res) => {
+  try {
+    const { title, taskType, location } = req.query;
+    
+    let query = {};
+    if (title) query.title = { $regex: title, $options: "i" };
+    if (taskType) query.taskType = taskType;
+    if (location) query.location = location;
+
+
+    const tasks = await Task.find(query);
+    if (!tasks.length) return res.status(404).json({ success: false, message: "No tasks found" });
+
+
+    res.status(200).json({ success: true, tasks });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+
+
+
+
+module.exports = {
+  createTaskHandler,
+  updateTaskHandler,
+  deleteTaskHandler,
+  getAllTasksHandler,
+  getTaskCreatorTasksHandler,
+  searchTasksHandler, 
+};
+
