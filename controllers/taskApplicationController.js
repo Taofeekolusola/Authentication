@@ -1,6 +1,7 @@
 const Joi = require("joi");
 const { Task, TaskApplication } = require("../models/Tasks");
 const { findById } = require("../models/Users");
+const paginate = require("../utils/paginate");
 
 const createTaskApplication = async (req, res) => {
   try{
@@ -139,8 +140,95 @@ const updateReviewStatus = async (req, res) => {
   }
 }
 
+const fetchAllApplicationsEarnerSchema = Joi.object({
+  search: Joi.string().allow("").optional(),
+  status: Joi.string().valid("Cancelled", "In Progress", "Pending", "Completed").optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+});
+
+const fetchAllApplicationsEarner = async (req, res) => {
+  try {
+    const { error } = fetchAllApplicationsEarnerSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+    const earnerId = req.user._id;
+    const { search, status, page, limit } = req.body;
+    const skip = (page - 1) * limit;
+  
+    let applicationQuery = { earnerId };
+    if (status) applicationQuery.earnerStatus = status;
+  
+    if (search && search.trim() !== "") {
+      const taskQuery = {
+        $or: [
+          { title: new RegExp(search, "i") },
+          { description: new RegExp(search, "i") },
+        ],
+      };
+      const matchingTasks = await Task.find(taskQuery).select("_id");
+      const matchingTaskIds = matchingTasks.map((task) => task._id);
+  
+      if (matchingTaskIds.length) {
+        applicationQuery.taskId = { $in: matchingTaskIds };
+      } else {
+        return res.status(200).json({
+          success: true,
+          message: "Task applications fetched successfully",
+          data: [],
+          pagination: paginate(0, page, limit),
+        });
+      }
+    }
+  
+    const total = await TaskApplication.countDocuments(applicationQuery);
+    const taskApplications = await TaskApplication.find(applicationQuery)
+      .populate("taskId")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+  
+    res.status(200).json({
+      success: true,
+      message: "Task applications fetched successfully",
+      data: taskApplications,
+      pagination: paginate(total, page, limit),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  } 
+}
+
+const fetchAllApplicationsCreatorSchema = Joi.object({
+
+});
+const fetchAllApplicationsCreator = async (req, res) => {
+  try{
+    const { earnerStatus, search, page = 1, limit = 10 } = req.body;
+
+    const { error } = fetchAllApplicationsCreatorSchema.validate({ reviewStatus });
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "",
+      data: "",
+    });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   createTaskApplication,
   updateEarnerStatus,
   updateReviewStatus,
+  fetchAllApplicationsCreator,
+  fetchAllApplicationsEarner,
 }
