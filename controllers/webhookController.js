@@ -4,8 +4,8 @@ const transferModel = require("../models/transferModel");
 const notificationModel = require("../models/notificationModel");
 const { sendEmailNotification } = require("../utils/emailHandler/emailNotification");
 const { generateEmailTemplate } = require("../utils/emailHandler/notificationMail");
-const { Wallet } = require("../models/walletModel");
-const { User } = require("../models/Users");
+const Wallet = require("../models/walletModel");
+const User = require("../models/Users");
 const { convertUsdToNgn } = require("../helpers/helpers");
 
 
@@ -91,6 +91,10 @@ const handleFlutterwaveWebhook = async (req, res) => {
   return res.status(200).json({ status: "success", message: "Flutterwave webhook processed successfully" });
 };
 
+
+/**
+ * Stripe webhook handler.
+ */
 const handleStripeWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
 
