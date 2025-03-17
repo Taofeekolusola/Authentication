@@ -1,7 +1,7 @@
 const Stripe = require("stripe");
-const { Transaction } = require("../models/transactionModel");
-const { transferModel } = require("../models/transferModel");
-const { notificationModel } = require("../models/notificationModel");
+const Transaction = require("../models/transactionModel");
+const transferModel = require("../models/transferModel");
+const notificationModel = require("../models/notificationModel");
 const { sendEmailNotification } = require("../utils/emailHandler/emailNotification");
 const { generateEmailTemplate } = require("../utils/emailHandler/notificationMail");
 const { Wallet } = require("../models/walletModel");
