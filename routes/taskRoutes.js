@@ -11,7 +11,7 @@ const upload = require("../middleware/multer");
 const isTaskCreator = require("../middleware/isTaskCreator");
 const { validation } = require("../middleware/auth");
 const isTaskEarner = require("../middleware/isTaskEarner");
-const { createTaskApplication, updateReviewStatus, updateEarnerStatus } = require("../controllers/taskApplicationController");
+const { createTaskApplication, updateReviewStatus, updateEarnerStatus, fetchAllApplicationsEarner, fetchAllApplicationsCreator } = require("../controllers/taskApplicationController");
 const isApplicationOwner = require("../middleware/isApplicationOwner");
 const isTaskOwner = require("../middleware/isTaskOwner");
 
@@ -34,10 +34,10 @@ route.patch("/:taskId/applications/:appId/status", validation, isTaskEarner, isA
 route.patch("/:taskId/applications/:appId/review", validation, isTaskCreator, isTaskOwner, updateReviewStatus);
 
 // Get all task applications for a earner
-route.get("/applications/earner", validation, isTaskEarner,)
+route.post("/applications/earner", validation, isTaskEarner, fetchAllApplicationsEarner);
 
 //Get all task applications for a creator
-route.get("/applications/creator", validation, isTaskCreator,)
+// route.post("/applications/creator", validation, isTaskCreator, fetchAllApplicationsCreator);
 
 
 module.exports = route;
