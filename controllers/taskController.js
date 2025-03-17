@@ -102,34 +102,44 @@ const createTaskHandler = async (req, res) => {
   }
 };
 
-
-// Update Task Handler
 const updateTaskHandler = async (req, res) => {
-  const { taskId } = req.params;
-  const updatedData = req.body;
   try {
+    const { taskId } = req.params;
+    const { status, ...otherUpdates } = req.body; // Extract status separately
+
+
+    // Check if taskId is valid
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      res.status.json(400).json("Invalid Task ID");
+      return res.status(400).json({ success: false, message: "Invalid Task ID" });
     }
 
-    const task = await Task.findById(taskId);
-    if (!task) {
-      res.status(404).json("Task not found");
+
+    // Allow only valid status values
+    const validStatuses = ["pending", "in_progress", "completed"];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status value" });
     }
 
-    await task.updateOne(updatedData);
-    res.status(200).json({
-      success: true,
-      message: "Task updated successfully!",
-      task: { ...task.toObject(), ...updatedData },
-    });
+
+    // Find task and update
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { $set: { status, ...otherUpdates } }, // Update status and other fields
+      { new: true, runValidators: true } // Return updated task, enforce validation
+    );
+
+
+    if (!updatedTask) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+
+    res.status(200).json({ success: true, message: "Task updated successfully", updatedTask });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    })
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
 };
+
 
 // Delete Task Handler
 const deleteTaskHandler = async (req, res) => {

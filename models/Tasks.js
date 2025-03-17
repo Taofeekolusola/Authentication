@@ -90,6 +90,11 @@ const TaskSchema = new mongoose.Schema(
       type: [AdditionalInfoSchema],
       default: [],
     },
+    status: {
+      type: String,
+      enum: ["pending", "in_progress", "completed"],
+      default: "pending",
+    },
   },
   {
     timestamps: true,
