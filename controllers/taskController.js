@@ -237,9 +237,72 @@ const getAllTasksHandler = async (req, res) => {
   }
 };
 
+//Get all tasks where status is completed
+const getCompletedTasksHandler = async (req, res) => {
+  try {
+    const tasks = await Task.find({ status: "completed" });
+    res.status(200).json({
+      success: true,
+      message: "Completed tasks fetched successfully!",
+      tasks,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    })
+  }
+};
+
+//Get the amount spent by the task creator
+const getTaskCreatorAmountSpentHandler = async (req, res) => {
+  const { taskId } = req.params;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json("Invalid Task ID");
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json("Task not found");
+    }
+
+    const amountSpent = task.compensation.amount;
+    res.status(200).json({
+      success: true,
+      message: "Amount spent by the task creator successfully!",
+      amountSpent,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// Get all available tasks
+const getAvailableTasksHandler = async (req, res) => {
+  try {
+    const tasks = await Task.find({ status: "available" });
+    res.status(200).json({
+      success: true,
+      message: "Available tasks fetched successfully!",
+      tasks,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
     createTaskHandler,
     updateTaskHandler,
     deleteTaskHandler,
     getAllTasksHandler,
-}
+    getCompletedTasksHandler,
+    getTaskCreatorAmountSpentHandler,
+};
