@@ -218,28 +218,66 @@ const getTaskCreatorTasksHandler = async (req, res) => {
 
 // Search Tasks Route
 const searchTasksHandler = async (req, res) => {
-  try {
-    const { title, taskType, location } = req.query;
-    
-    let query = {};
-    if (title) query.title = { $regex: title, $options: "i" };
-    if (taskType) query.taskType = taskType;
-    if (location) query.location = location;
+ try { 
+     const page = parseInt(req.query.page) - 1 || 0;
+     const limit = parseInt(req.query.limit) || 5;
+     const search = req.query.search || "";
+     let sort = req.query.sort || "createdAt";
+     let title = req.query.title || "All";
+     
+     const taskOptions = [
+         "userId",
+         "title",
+         "taskType",
+        "description",
+        "location",
+        "compensation",
+        "noOfRespondents",
+        "deadline",
+        "requirements",
+        "status",
+        "additionalInfo",
+      ];
 
+      title === "All"
+         ?(title = [...taskOptions])
+         :(title = req.query.title.split(","));
+      req.query.sort?(sort = req.query.sort.split(",")) : (sort = [sort]);
 
-    const tasks = await Task.find(query);
-    if (!tasks.length) return res.status(404).json({ success: false, message: "No tasks found" });
+      let sortBy = {};
+      if (sort[1]) {
+        sortBy[sort[0]] = sort[1];
+      } else {
+        sortBy[sort[0]] = 'asc';
+      }
 
+      const searchTasks = await Task.find({title: {$regex: search, $options: "i" }})
+         .where("title")
+         .in([...title])
+         .sort(sortBy)
+         .skip(page * limit)
+         .limit(limit);
 
-    res.status(200).json({ success: true, tasks });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+      const total = await Task.countDocuments({
+        title: { $in: [...title]},
+        name: { $regex: search, $options: "i" },
+      });
+
+      const response = {
+        error: false,
+        total,
+        page: page + 1,
+        limit,
+        title: taskOptions,
+        searchTasks,
+      }
+
+      res.status(200).json(response);
+ } catch (err) {
+  console.log(err);
+  res.status(500).json({error:true, message:"Internal Server Error"})
+ }
 };
-
-
-
-
 
 module.exports = {
   createTaskHandler,
