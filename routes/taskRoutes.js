@@ -37,7 +37,7 @@ route.patch("/:taskId/applications/:appId/review", validation, isTaskCreator, is
 route.post("/applications/earner", validation, isTaskEarner, fetchAllApplicationsEarner);
 
 //Get all task applications for a creator
-// route.post("/applications/creator", validation, isTaskCreator, fetchAllApplicationsCreator);
+route.post("/applications/creator", validation, isTaskCreator, fetchAllApplicationsCreator);
 
 
 module.exports = route;
