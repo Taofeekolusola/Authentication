@@ -57,13 +57,16 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
     expertise: {
-      type: [String],
+      type: String,
+      enum: ["Web Development", "Content Writing", "DevOps", "UI/UX Design"]
     },
     languages: {
-      type: [String],
+      type: String,
+      enum: ["English", "French", "Spanish", "German", "Chinese"]
     },
     location: {
       type: String,
+      enum: ["Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France"]
     },
     getNotifiedAboutNewTasks: {
       type: Boolean,
@@ -73,6 +76,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    referralCode:{
+      type: String,
+      unique: true,
+  },
     resetPasswordToken: String,
     resetPasswordExpiresAt: Date,
     verificationToken: String,
@@ -83,4 +90,5 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
+module.exports = User;

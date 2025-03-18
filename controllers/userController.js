@@ -5,12 +5,15 @@ const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
 const cloudinary = require('../utils/cloudinary');
 const fs = require('fs');
-const validateArrayFields = require("../utils/validateArrayFields");
 const updateModelFields = require("../utils/updatModelFields");
+const Joi = require("joi");
+const Settings = require("../models/Settings");
+const { generateAlphanumericCode } = require("../helpers/helpers");
+const ReferralModel = require("../models/referralModel");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
-  const { firstName, email, password, lastName, phoneNumber, confirmPassword } = req.body;
+  const { firstName, email, password, lastName, phoneNumber, confirmPassword, referralCode } = req.body;
 
   try {
     if (!firstName || !email || !password || !lastName || !phoneNumber || !confirmPassword) {
@@ -23,8 +26,6 @@ const SignupHandlerTaskEarner = async (req, res) => {
       return res.status(400).json({ message: "Invalid email format!" });
     }
 
-    //
-
     const existingUser = await User.findOne({ email }).exec();
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists in the database!" });
@@ -35,6 +36,7 @@ const SignupHandlerTaskEarner = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userReferralCode = generateAlphanumericCode(8);
 
     const newUser = await User.create({
       firstName,
@@ -43,13 +45,27 @@ const SignupHandlerTaskEarner = async (req, res) => {
       lastName,
       phoneNumber,
       isTaskEarner: true,
-      confirmPassword
+      confirmPassword,
+      referralCode: userReferralCode,
     });
+
+    let referral = {}
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode }).lean();
+      if (referrer) {
+        referral = await ReferralModel.findOneAndUpdate(
+          { referrerId: referrer._id, email },
+          { status: "Invite accepted", acceptedAt: new Date(), refereeId: newUser._id },
+          { new: true, upsert: true }
+        )
+      } 
+    }
 
     return res.status(201).json({
       success: true,
       message: "Task Earner created!",
-      newUser
+      newUser,
+      referral,
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -146,7 +162,7 @@ const SignupHandlerTaskCreator = async (req, res) => {
 const loginHandler = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -156,7 +172,15 @@ const loginHandler = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-
+    // Generate referral code if user does not have one
+    if (!user.referralCode && user.isTaskEarner) {
+      const referralCode = generateAlphanumericCode(8);
+      user = await User.findOneAndUpdate(
+        { email },
+        { $set: { referralCode } },
+        { new: true }
+      );
+    }
     // Generate JWT Token
     const token = jwt.sign(
       { userId: user._id }, 
@@ -164,9 +188,11 @@ const loginHandler = async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    const { password: _, confirmPassword: __, ...rest } = user.toObject();
     res.json({
       message: "Login successful",
       token,
+      data: rest
     });
 
   } catch (error) {
@@ -360,30 +386,43 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-      console.log("🔍 req.user in getUserProfile:", req.user);
+    console.log("🔍 req.user in getUserProfile:", req.user);
 
-      if (!req.user || !req.user._id || !req.user._id.toString()) {
-          console.log("req.user is missing or invalid");
-          return res.status(401).json({ message: "Unauthorized" });
-      }
+    if (!req.user || !req.user._id) {
+      console.log("req.user is missing or invalid");
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-      const userProfile = await User.findById(req.user._id).select(
-          "firstName lastName email phoneNumber createdAt"
-      );
+    const userProfile = await User.findById(req.user._id).lean();
 
-      if (!userProfile) {
-          return res.status(404).json({ message: "User not found" });
-      }
+    if (!userProfile) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-      return res.json({ profile: userProfile });
+    const { password, confirmPassword, ...rest } = userProfile;
+
+    return res.status(200).json({ profile: rest });
   } catch (error) {
-      console.error("Get user profile error:", error.message);
-      return res.status(500).json({ message: "Internal Server Error" });
+    console.error("Get user profile error:", error.message);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-const allowedLanguages = ["English", "French", "Spanish", "German", "Chinese"];
-const allowedExpertise = ["Web Development", "Content Writing", "DevOps", "UI/UX Design"];
+
+const updateUserProfileSchema = Joi.object({
+  firstName: Joi.string().min(2).max(50).optional(),
+  lastName: Joi.string().min(2).max(50).optional(),
+  location: Joi.string()
+    .valid("Nigeria", "Rwanda", "Kenya", "United States", "Spain", "France")
+    .optional(),
+  languages: Joi.string()
+    .valid("English", "French", "Spanish", "German", "Chinese")
+    .optional(),
+  expertise: Joi.string()
+    .valid("Web Development", "Content Writing", "DevOps", "UI/UX Design")
+    .optional(),
+  bio: Joi.string().max(500).optional(),
+});
 
 const updateUserProfile = async (req, res) => {
   try {
@@ -391,23 +430,21 @@ const updateUserProfile = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    const { error } = updateUserProfileSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ message: error.details.map((err) => err.message) });
+    }
+
     const userData = {
       firstName: req.body.firstName || user.firstName,
       lastName: req.body.lastName || user.lastName,
       location: req.body.location || user.location,
       bio: req.body.bio || user.bio,
-      languages: user.languages,
-      expertise: user.expertise,
+      languages: req.body.languages || user.languages,
+      expertise: req.body.expertise || user.expertise,
       userImageUrl: user.userImageUrl,
       cloudinaryId: user.cloudinaryId,
     };
-
-    try {
-      if (req.body.languages) userData.languages = validateArrayFields(req.body.languages, allowedLanguages);
-      if (req.body.expertise) userData.expertise = validateArrayFields(req.body.expertise, allowedExpertise);
-    } catch (validationError) {
-      return res.status(400).json({ message: validationError.message });
-    }
 
     if (req.file) {
       try {
@@ -421,10 +458,11 @@ const updateUserProfile = async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, userData, { new: true });
+    const { password: _, confirmPassword: __, ...rest } = updatedUser.toObject();
     res.status(200).json({
       success: true,
       message: "Successfully updated user profile!",
-      data: { user: updatedUser },
+      data: { user: rest },
     });
   } catch (error) {
     console.error(error);
@@ -480,6 +518,50 @@ const handlePasswordUpdate = async (userId, currentPassword, newPassword, confir
   return { password: hashedPassword };
 };
 
+const settingsSchema = Joi.object({
+  autoSaveDrafts: Joi.boolean().optional(),
+  soundNotifications: Joi.boolean().optional(),
+  inAppNotifications: Joi.boolean().optional(),
+  smsNotification: Joi.boolean().optional(),
+  emailNotifications: Joi.boolean().optional(),
+  dataSharingPreferences: Joi.boolean().optional(),
+  activityHistory: Joi.boolean().optional(),
+  thirdPartyIntegrations: Joi.boolean().optional(),
+  profileVisibility: Joi.string().valid("public", "private").optional(),
+  nameOnCard: Joi.string().allow(null, "").optional(),
+  cardNumber: Joi.string().creditCard().optional(),
+  cardCvv: Joi.string().pattern(/^\d{3}$/).optional(),
+  cardExpDate: Joi.string().pattern(/^(0[1-9]|1[0-2])\/\d{2}$/).optional(),
+});
+
+const updateUserSettings = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const { error, value } = settingsSchema.validate(req.body, { stripUnknown: true });
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    if (Object.keys(value).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    const updatedSettings = await Settings.findOneAndUpdate(
+      { userId },
+      { $set: value },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Settings updated successfully!",
+      data: updatedSettings,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -489,5 +571,6 @@ module.exports = {
   verifyResetCode,
   getUserProfile,
   updateUserProfile,
-  changeAccountSettings
+  changeAccountSettings,
+  updateUserSettings
 };
