@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
+const { TaskApplication } = require("../models/Tasks");
+const mongoose = require("mongoose");
 
 
 // const createTaskHandler = async (req, res) => {
@@ -272,22 +274,22 @@ const getTaskCreatorTasksHandler = async (req, res) => {
   }
 };
 
-//Get all tasks where status is completed
-const getCompletedTasksHandler = async (req, res) => {
-  try {
-    const tasks = await Task.find({ status: "completed" });
-    res.status(200).json({
-      success: true,
-      message: "Completed tasks fetched successfully!",
-      tasks,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    })
-  }
-};
+// //Get all tasks where status is completed
+// const getCompletedTasksHandler = async (req, res) => {
+//   try {
+//     const tasks = await Task.find({ status: "completed" });
+//     res.status(200).json({
+//       success: true,
+//       message: "Completed tasks fetched successfully!",
+//       tasks,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: "Internal Server Error",
+//       error: error.message,
+//     })
+//   }
+// };
 
 //Get the amount spent by the task creator
 const getTaskCreatorAmountSpentHandler = async (req, res) => {
@@ -333,6 +335,50 @@ const getAvailableTasksHandler = async (req, res) => {
   }
 };
 
+// Get all tasks in progress
+const getInProgressTasksHandler = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // Count tasks where earnerStatus is "In Progress"
+    const inProgressCount = await TaskApplication.countDocuments({
+      earnerId: userId,
+      earnerStatus: "In Progress",
+    });
+
+    res.json({ inProgressCount });
+  } catch (error) {
+    console.error("Error fetching in-progress tasks:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+//Completed Tasks
+const getCompletedTasksHandler = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // Count tasks where earnerStatus is "Completed"
+    const completedCount = await TaskApplication.countDocuments({
+      earnerId: userId,
+      earnerStatus: "Completed",
+    });
+
+    res.json({ completedCount });
+  } catch (error) {
+    console.error("Error fetching completed tasks:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
     createTaskHandler,
     updateTaskHandler,
@@ -340,4 +386,8 @@ module.exports = {
     getAllTasksHandler,
     getCompletedTasksHandler,
     getTaskCreatorAmountSpentHandler,
+    getTaskCreatorTasksHandler,
+    getAvailableTasksHandler,
+    getInProgressTasksHandler
+  
 };
