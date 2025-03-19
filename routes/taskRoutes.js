@@ -6,6 +6,7 @@ const {
   deleteTaskHandler,
   getAllTasksHandler,
   getTaskCreatorTasksHandler,
+  getTaskCreatorDashboard,
 } = require("../controllers/taskController");
 const upload = require("../middleware/multer");
 const isTaskCreator = require("../middleware/isTaskCreator");
@@ -20,6 +21,9 @@ route.put("/update/:taskId", validation, updateTaskHandler);
 route.delete("/delete/:taskId", validation, deleteTaskHandler);
 route.get("/all", validation, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
+route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard)
+
+
 
 // Task Applications
 
