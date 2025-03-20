@@ -10,6 +10,8 @@ const Joi = require("joi");
 const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
 const ReferralModel = require("../models/referralModel");
+const { TaskApplication, Task } = require("../models/Tasks");
+const mongoose = require("mongoose");
 
 // Signup for Task Earner
 const SignupHandlerTaskEarner = async (req, res) => {
@@ -562,6 +564,39 @@ const updateUserSettings = async (req, res) => {
   }
 }
 
+//Get total Earnings
+const amountEarned = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // Find approved task applications for the user
+    const approvedApplications = await TaskApplication.find({
+      earnerId: userId,
+      reviewStatus: "Approved",
+    }).populate({
+      path: "taskId",
+      select: "compensation.amount",
+    });
+
+    // Calculate total earnings
+    const totalEarnings = approvedApplications.reduce((sum, application) => {
+      if (application.taskId) {
+        sum += application.taskId.compensation.amount || 0;
+      }
+      return sum;
+    }, 0);
+
+    res.json({ totalEarnings });
+  } catch (error) {
+    console.error("Error fetching total earnings:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -572,5 +607,6 @@ module.exports = {
   getUserProfile,
   updateUserProfile,
   changeAccountSettings,
-  updateUserSettings
+  updateUserSettings,
+  amountEarned
 };
