@@ -1,13 +1,5 @@
 const mongoose = require("mongoose");
 
-const AdditionalInfoSchema = new mongoose.Schema(
-  {
-    type: { type: String, required: true }, // e.g., "file", "url", "image"
-    value: { type: String, required: true }, // Stores file path, URL, or image link
-  },
-  { _id: false } // Prevents Mongoose from automatically creating an _id for each object
-);
-
 const TaskSchema = new mongoose.Schema(
   {
     userId: {
@@ -22,7 +14,13 @@ const TaskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
+      enum: ["Web Development", "Design", "Review", "Writing"],
       required: true,
+    },
+    visibility: {
+      type: String,
+      enum: ["Published", "Draft"],
+      default: "Draft",
     },
     link1: {
       type: String,
@@ -68,8 +66,8 @@ const TaskSchema = new mongoose.Schema(
       required: true,
     },
     additionalInfo: {
-      type: [AdditionalInfoSchema],
-      default: [],
+      type: String,
+      default: "",
     },
   },
   {

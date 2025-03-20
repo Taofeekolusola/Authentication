@@ -15,7 +15,7 @@ const { createTaskApplication, updateReviewStatus, updateEarnerStatus, fetchAllA
 const isApplicationOwner = require("../middleware/isApplicationOwner");
 const isTaskOwner = require("../middleware/isTaskOwner");
 
-route.post("/create", validation, upload.array("files", 5), createTaskHandler);
+route.post("/", validation, isTaskCreator, upload.single('addInfo'), createTaskHandler);
 route.put("/update/:taskId", validation, updateTaskHandler);
 route.delete("/delete/:taskId", validation, deleteTaskHandler);
 route.get("/all", validation, getAllTasksHandler);

@@ -1,166 +1,27 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
-
-
-// const createTaskHandler = async (req, res) => {
-//   try {
-//     const {
-//       title,
-//       requirements,
-//       description,
-//       compensation,
-//       noOfRespondents,
-//       deadline,
-//       link1,
-//       taskType,
-//       location,
-//       link2,
-//       additionalInfo, // Might be a JSON string or missing
-//     } = req.body;
-
-//     // Validate required fields
-//     if (!title || !description || !requirements || !deadline || !compensation || !taskType || !location) {
-//       return res.status(400).json({ error: "Missing required field." });
-//     }
-  
-//     // Validate compensation format
-//     let parsedCompensation;
-//     try {
-//       parsedCompensation = typeof compensation === "string" ? JSON.parse(compensation) : compensation;
-//       if (!parsedCompensation.currency || !parsedCompensation.amount) {
-//         return res.status(400).json({ error: "Invalid compensation format." });
-//       }
-//       parsedCompensation = {
-//         currency: parsedCompensation.currency.toUpperCase(),
-//         amount: Number(parsedCompensation.amount),
-//       };
-//     } catch (error) {
-//       return res.status(400).json({ error: "Invalid JSON format in compensation." });
-//     }
-
-//     let additionalInfoArray = [];
-
-//     // ✅ Ensure `req.files` are properly stored
-//     if (req.files && req.files.length > 0) {
-//       additionalInfoArray.push(
-//         ...req.files.map((file) => ({ type: "file", value: `/uploads/${file.filename}` }))
-//       );
-//     }
-
-//     // ✅ Ensure `additionalInfo` is parsed properly
-//     if (additionalInfo) {
-//       try {
-//         const parsedAdditionalInfo = JSON.parse(additionalInfo);
-//         if (Array.isArray(parsedAdditionalInfo)) {
-//           additionalInfoArray.push(...parsedAdditionalInfo);
-//         } else {
-//           return res.status(400).json({ error: "additionalInfo must be an array." });
-//         }
-//       } catch (error) {
-//         return res.status(400).json({ error: "Invalid JSON format in additionalInfo." });
-//       }
-//     }
-
-//     const task = await Task.create({
-//       title,
-//       description,
-//       link1,
-//       taskType,
-//       deadline,
-//       noOfRespondents,
-//       compensation: parsedCompensation,
-//       link2,
-//       additionalInfo: additionalInfoArray,
-//       location,
-//       requirements,
-//     });
-
-//     res.status(201).json({ success: true, message: "Task created successfully!", task });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error", error: error.message });
-//   }
-// };
-
+const fs = require("fs");
+const cloudinary = require("../utils/cloudinary");
+const taskValidationSchema = require("../validations/taskValidation");
 
 const createTaskHandler = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const {
-      title,
-      requirements,
-      description,
-      compensation,
-      noOfRespondents,
-      deadline,
-      link1,
-      taskType,
-      location,
-      link2,
-      additionalInfo, // Could be undefined
-    } = req.body;
-
-    // Validate required fields
-    if (!title || !description || !requirements || !deadline || !compensation || !taskType || !location) {
-      return res.status(400).json({ error: "Missing required field." });
+    const taskCreatorId = req.user._id;
+    const { error, value } = taskValidationSchema.validate(req.body, {
+      abortEarly: false,
+      allowUnknown: true,
+    });
+    if (error) {
+      return res.status(400).json({ error: error.details.map((d) => d.message) });
     }
 
-    // Validate compensation format
-    let parsedCompensation;
-    try {
-      parsedCompensation = typeof compensation === "string" ? JSON.parse(compensation) : compensation;
-      if (!parsedCompensation.currency || !parsedCompensation.amount) {
-        return res.status(400).json({ error: "Invalid compensation format." });
-      }
-      parsedCompensation = {
-        currency: parsedCompensation.currency.toUpperCase(),
-        amount: Number(parsedCompensation.amount),
-      };
-    } catch (error) {
-      return res.status(400).json({ error: "Invalid JSON format in compensation." });
-    }
-
-    let additionalInfoArray = [];
-
-    // ✅ Handle uploaded files
-    if (req.files && req.files.length > 0) {
-      additionalInfoArray.push(
-        ...req.files.map((file) => ({ type: "file", value: `/uploads/${file.filename}` }))
-      );
-    }
-
-    // ✅ Parse `additionalInfo` safely
-    if (additionalInfo) {
-      try {
-        const parsedAdditionalInfo = JSON.parse(additionalInfo);
-        if (Array.isArray(parsedAdditionalInfo)) {
-          additionalInfoArray.push(...parsedAdditionalInfo);
-        } else {
-          return res.status(400).json({ error: "additionalInfo must be an array." });
-        }
-      } catch (error) {
-        return res.status(400).json({ error: "Invalid JSON format in additionalInfo." });
-      }
-    }
-
-    // ✅ Prevent empty `additionalInfo` errors
-    if (!additionalInfoArray.length) {
-      additionalInfoArray = [{ type: "note", value: "No additional info provided" }];
-    }
+    let additionalInfo = req.file ? req.file.path : "";
 
     const task = await Task.create({
-      userId,
-      title,
-      description,
-      link1,
-      taskType,
-      deadline,
-      noOfRespondents,
-      compensation: parsedCompensation,
-      link2,
-      additionalInfo: additionalInfoArray,
-      location,
-      requirements,
+      userId: taskCreatorId,
+      ...value,
+      additionalInfo,
     });
 
     res.status(201).json({ success: true, message: "Task created successfully!", task });
@@ -172,6 +33,7 @@ const createTaskHandler = async (req, res) => {
 // Update Task Handler
 const updateTaskHandler = async (req, res) => {
   const { taskId } = req.params;
+  const taskCreatorId = req.user._id;
   const updatedData = req.body;
   try {
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
@@ -190,10 +52,8 @@ const updateTaskHandler = async (req, res) => {
       task: { ...task.toObject(), ...updatedData },
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    })
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" })
   }
 };
 
