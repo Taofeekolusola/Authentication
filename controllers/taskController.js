@@ -36,7 +36,6 @@ const createTaskHandler = async (req, res) => {
 const updateTaskHandler = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const taskCreatorId = req.user._id;
     const updateData = { ...req.body };
 
     const { error, value } = updateTaskValidationSchema.validate(updateData, { abortEarly: false });
