@@ -87,7 +87,7 @@ app.get('/', async (req, res) => {
 
 // Routes
 app.use('/users', userRoutes);
-app.use('/tasks', taskRoutes);
+app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1', paymentRoute);
 app.use('/api/v1/webhooks', webhookRoute);
 app.use('/api/v1/auth', authRoutes);
