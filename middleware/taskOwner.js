@@ -7,7 +7,7 @@ const taskOwner = async (req, res, next) => {
     const { taskId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
-        res.status(400).json({ status: false, message: "Invalid Task ID" });
+        return res.status(400).json({ status: false, message: "Invalid Task ID" });
     }
 
     const task = await Task.findOne(
