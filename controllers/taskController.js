@@ -2,13 +2,15 @@ const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
 const fs = require("fs");
-const cloudinary = require("../utils/cloudinary");
-const taskValidationSchema = require("../validations/taskValidation");
+const {
+  createTaskValidationSchema,
+  updateTaskValidationSchema
+} = require("../validations/taskValidation");
 
 const createTaskHandler = async (req, res) => {
   try {
     const taskCreatorId = req.user._id;
-    const { error, value } = taskValidationSchema.validate(req.body, {
+    const { error, value } = createTaskValidationSchema.validate(req.body, {
       abortEarly: false,
       allowUnknown: true,
     });
@@ -24,7 +26,7 @@ const createTaskHandler = async (req, res) => {
       additionalInfo,
     });
 
-    res.status(201).json({ success: true, message: "Task created successfully!", task });
+    res.status(201).json({ status: true, message: "Task created successfully!", task });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
@@ -32,24 +34,42 @@ const createTaskHandler = async (req, res) => {
 
 // Update Task Handler
 const updateTaskHandler = async (req, res) => {
-  const { taskId } = req.params;
-  const taskCreatorId = req.user._id;
-  const updatedData = req.body;
   try {
-    if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      res.status.json(400).json("Invalid Task ID");
+    const { taskId } = req.params;
+    const taskCreatorId = req.user._id;
+    const updateData = { ...req.body };
+
+    const { error, value } = updateTaskValidationSchema.validate(updateData, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ status: false, errors: error.details.map((d) => d.message) });
     }
 
     const task = await Task.findById(taskId);
     if (!task) {
-      res.status(404).json("Task not found");
+      return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    await task.updateOne(updatedData);
+    if (req.file) {
+      if (task.additionalInfo) {
+        try {
+          fs.unlinkSync(task.additionalInfo);
+        } catch (err) {
+          console.error("File deletion error:", err.message);
+        }
+      }
+      value.additionalInfo = req.file.path;
+    }
+
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      value,
+      { new: true, runValidators: true }
+    );
+
     res.status(200).json({
       success: true,
       message: "Task updated successfully!",
-      task: { ...task.toObject(), ...updatedData },
+      task: updatedTask,
     });
   } catch (error) {
     console.error(error);
@@ -57,20 +77,13 @@ const updateTaskHandler = async (req, res) => {
   }
 };
 
-// Delete Task Handler
 const deleteTaskHandler = async (req, res) => {
-  const { taskId } = req.params;
   try {
-    if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      res.status(400).json("Invalid Task ID");
-    }
-
-    const task = await Task.findById(taskId);
+    const task = await Task.findByIdAndDelete(req.params.taskId);
     if (!task) {
-      res.status(404).json("Task not found");
+      return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    await task.deleteOne();
     res.status(200).json({
       success: true,
       message: "Task deleted successfully!",
@@ -79,7 +92,7 @@ const deleteTaskHandler = async (req, res) => {
     res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
-    })
+    });
   }
 };
 

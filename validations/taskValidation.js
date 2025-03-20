@@ -21,7 +21,7 @@ const compensationSchema = Joi.alternatives().try(
   }, "JSON parsing for compensation")
 );
 
-const taskValidationSchema = Joi.object({
+const createTaskValidationSchema = Joi.object({
   title: Joi.string().trim().required(),
   taskType: Joi.string().valid("Web Development", "Design", "Review", "Writing").required(),
   description: Joi.string().trim().required(),
@@ -32,7 +32,24 @@ const taskValidationSchema = Joi.object({
   link1: Joi.string().uri().allow(null, ""),
   link2: Joi.string().uri().allow(null, ""),
   compensation: compensationSchema.optional(),
-  additionalInfo: Joi.string().optional(),
 });
 
-module.exports = taskValidationSchema;
+const updateTaskValidationSchema = Joi.object({
+  title: Joi.string().trim().optional(),
+  taskType: Joi.string()
+    .valid("Web Development", "Design", "Review", "Writing")
+    .optional(),
+  description: Joi.string().trim().optional(),
+  location: Joi.string().valid("Remote", "Onsite").optional(),
+  deadline: Joi.date().iso().optional(),
+  noOfRespondents: Joi.number().integer().positive().optional(),
+  requirements: Joi.string().trim().optional(),
+  link1: Joi.string().uri().allow(null, "").optional(),
+  link2: Joi.string().uri().allow(null, "").optional(),
+  compensation: compensationSchema.optional(),
+});
+
+module.exports = {
+  createTaskValidationSchema,
+  updateTaskValidationSchema,
+}
