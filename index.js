@@ -109,6 +109,10 @@ app.use((err, req, res, next) => {
 
 // Start the server
 const PORT = process.env.PORT || 8080;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${8080}`;
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`API Base URL: ${BASE_URL}`
+    );
 });
