@@ -14,10 +14,11 @@ const isTaskEarner = require("../middleware/isTaskEarner");
 const { createTaskApplication, updateReviewStatus, updateEarnerStatus, fetchAllApplicationsEarner, fetchAllApplicationsCreator } = require("../controllers/taskApplicationController");
 const isApplicationOwner = require("../middleware/isApplicationOwner");
 const isTaskOwner = require("../middleware/isTaskOwner");
+const taskOwner = require("../middleware/taskOwner");
 
-route.post("/create", validation, upload.array("files", 5), createTaskHandler);
-route.put("/update/:taskId", validation, updateTaskHandler);
-route.delete("/delete/:taskId", validation, deleteTaskHandler);
+route.post("/", validation, isTaskCreator, upload.single('addInfo'), createTaskHandler);
+route.patch("/:taskId", validation, isTaskCreator, taskOwner, upload.single('addInfo'), updateTaskHandler);
+route.delete("/:taskId", validation, isTaskCreator, taskOwner, deleteTaskHandler);
 route.get("/all", validation, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
 
