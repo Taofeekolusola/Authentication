@@ -101,13 +101,13 @@ const getAllTasksHandler = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const pageNumber = parseInt(page, 10);
     const pageSize = parseInt(limit, 10);
+    
     const skip = (pageNumber - 1) * pageSize;
-
-    const tasks = await Task.find({})
+    const tasks = await Task.find({ visibility: "Published" })
       .skip(skip)
       .limit(pageSize)
       .sort({ createdAt: -1 });
-    const total = await Task.countDocuments({});
+    const total = await Task.countDocuments({ visibility: "Published" });
     
     return res.status(200).json({
       success: true,
@@ -141,6 +141,101 @@ const getTaskCreatorTasksHandler = async (req, res) => {
       message: "Internal Server Error",
       error: error.message,
     })
+  }
+};
+
+const searchAllTasksHandler = async (req, res) => {
+  try {
+    const { error, value } = searchTasksSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: error.details.map((detail) => detail.message),
+      });
+    }
+
+    const {
+      page,
+      limit,
+      datePosted,
+      taskType,
+      search,
+      minApplications,
+      maxApplications,
+      minPay,
+      maxPay,
+    } = value;
+
+    const skip = (page - 1) * limit;
+
+    let filters = { visibility: "Published" };
+
+    if (datePosted) {
+      filters.postedAt = { $gte: new Date(datePosted) };
+    }
+
+    if (taskType) {
+      filters.taskType = taskType;
+    }
+
+    if (search) {
+      filters.title = { $regex: search, $options: "i" };
+    }
+
+    if (minApplications !== undefined || maxApplications !== undefined) {
+      filters.numberOfRespondents = {};
+      if (minApplications !== undefined) filters.numberOfRespondents.$gte = minApplications;
+      if (maxApplications !== undefined) filters.numberOfRespondents.$lte = maxApplications;
+    }
+
+    if (minPay !== undefined || maxPay !== undefined) {
+      filters.compensation = {};
+      filters.compensation.amount = {}
+      if (minPay !== undefined) filters.compensation.amount.$gte = minPay;
+      if (maxPay !== undefined) ffilters.compensation.amount.$lte = maxPay;
+    }
+
+    const tasks = await Task.find(filters)
+      .skip(skip)
+      .limit(pageSize)
+      .sort({ createdAt: -1 });
+
+    const total = await Task.countDocuments(filters);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+      pagination: paginate(total, page, limit),
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// Fetch all tasks handler
+const postTaskHandler = async (req, res) => {
+  try { 
+    const { taskId } = req.params;    
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId },
+      { visibility: "Published", postedAt: new Date() },
+      { new: true }
+    );
+    
+    return res.status(200).json({
+      success: true,
+      message: "Task posted successfully!",
+      data: task,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -258,6 +353,7 @@ module.exports = {
     getTaskCreatorAmountSpentHandler,
     getTaskCreatorTasksHandler,
     getAvailableTasksHandler,
-    getInProgressTasksHandler
-  
+    getInProgressTasksHandler,
+    searchAllTasksHandler,
+    postTaskHandler  
 };
