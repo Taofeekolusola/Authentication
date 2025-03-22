@@ -4,7 +4,8 @@ const paginate = require("../utils/paginate");
 const fs = require("fs");
 const {
   createTaskValidationSchema,
-  updateTaskValidationSchema
+  updateTaskValidationSchema,
+  searchTasksSchema
 } = require("../validations/taskValidation");
 
 const createTaskHandler = async (req, res) => {
@@ -183,22 +184,21 @@ const searchAllTasksHandler = async (req, res) => {
       filters.title = { $regex: search, $options: "i" };
     }
 
-    if (minApplications !== undefined || maxApplications !== undefined) {
-      filters.numberOfRespondents = {};
-      if (minApplications !== undefined) filters.numberOfRespondents.$gte = minApplications;
-      if (maxApplications !== undefined) filters.numberOfRespondents.$lte = maxApplications;
+    if (minApplications || maxApplications) {
+      filters.noOfRespondents = {};
+      if (minApplications) filters.noOfRespondents.$gte = minApplications;
+      if (maxApplications) filters.noOfRespondents.$lte = maxApplications;
     }
 
-    if (minPay !== undefined || maxPay !== undefined) {
-      filters.compensation = {};
-      filters.compensation.amount = {}
-      if (minPay !== undefined) filters.compensation.amount.$gte = minPay;
-      if (maxPay !== undefined) ffilters.compensation.amount.$lte = maxPay;
+    if (minPay || maxPay) {
+      filters["compensation.amount"] = {}
+      if (minPay) filters["compensation.amount"].$gte = minPay;
+      if (maxPay) filters["compensation.amount"].$lte = maxPay;
     }
 
     const tasks = await Task.find(filters)
       .skip(skip)
-      .limit(pageSize)
+      .limit(limit)
       .sort({ createdAt: -1 });
 
     const total = await Task.countDocuments(filters);
@@ -211,10 +211,8 @@ const searchAllTasksHandler = async (req, res) => {
     });
 
   } catch (error) {
-    return res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    });
+    console.error(error)
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 

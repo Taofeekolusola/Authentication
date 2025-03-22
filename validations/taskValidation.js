@@ -58,10 +58,11 @@ const searchTasksSchema = Joi.object({
   maxApplications: Joi.number().integer().min(0),
   minPay: Joi.number().min(0),
   maxPay: Joi.number().min(0),
-  taskType: Joi.string().valid("Web Development", "Design", "Review", "Writing").required(),
+  taskType: Joi.string().valid("Web Development", "Design", "Review", "Writing"),
 });
 
 module.exports = {
   createTaskValidationSchema,
   updateTaskValidationSchema,
+  searchTasksSchema
 }
