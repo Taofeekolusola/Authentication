@@ -49,7 +49,20 @@ const updateTaskValidationSchema = Joi.object({
   compensation: compensationSchema.optional(),
 });
 
+const searchTasksSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).default(10),
+  datePosted: Joi.date().iso(), 
+  search: Joi.string().trim().allow(""),
+  minApplications: Joi.number().integer().min(0),
+  maxApplications: Joi.number().integer().min(0),
+  minPay: Joi.number().min(0),
+  maxPay: Joi.number().min(0),
+  taskType: Joi.string().valid("Web Development", "Design", "Review", "Writing"),
+});
+
 module.exports = {
   createTaskValidationSchema,
   updateTaskValidationSchema,
+  searchTasksSchema
 }
