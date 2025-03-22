@@ -345,35 +345,6 @@ const getCompletedTasksHandler = async (req, res) => {
   }
 };
 
-
-// Search tasks
- const searchTasksHandler = async (req, res) => {
-  try {
-    const { query } = req.query; // Get the search query
-
-    if (!query) {
-      return res.status(400).json({ status: "FAILED", message: "Search query is required" });
-    }
-
-    // Perform search (case insensitive)
-    const tasks = await Task.find({
-      $or: [
-        { title: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } }
-      ]
-    });
-
-    if (tasks.length === 0) {
-      return res.status(404).json({ status: "FAILED", message: "No tasks found" });
-    }
-
-    res.status(200).json({ status: "SUCCESS", data: tasks });
-
-  } catch (error) {
-    res.status(500).json({ status: "FAILED", message: "Error searching tasks", error: error.message });
-  }
-};
-
 const getTaskCreatorDashboard = async (req, res) => {
   try {
     const { userId, exportPdf } = req.query;
@@ -496,7 +467,6 @@ module.exports = {
     getInProgressTasksHandler,
     searchAllTasksHandler,
     postTaskHandler,
-    searchTasksHandler,
     getTaskCreatorDashboard,
   
 };
