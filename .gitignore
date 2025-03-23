@@ -1,5 +1,4 @@
 .env
 /node_modules
 /exports
-/uploads
 package-lock.json
