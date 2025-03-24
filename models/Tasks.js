@@ -22,6 +22,10 @@ const TaskSchema = new mongoose.Schema(
       enum: ["Published", "Draft"],
       default: "Draft",
     },
+    postedAt: {
+      type: Date,
+      default: null,
+    },
     link1: {
       type: String,
       default: null,
@@ -54,7 +58,7 @@ const TaskSchema = new mongoose.Schema(
       },
     },
     noOfRespondents: {
-      type: String,
+      type: Number,
       required: true,
     },
     deadline: {

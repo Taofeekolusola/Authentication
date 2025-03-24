@@ -7,7 +7,8 @@ const PDFDocument = require("pdfkit");
 
 const {
   createTaskValidationSchema,
-  updateTaskValidationSchema
+  updateTaskValidationSchema,
+  searchTasksSchema
 } = require("../validations/taskValidation");
 
 const createTaskHandler = async (req, res) => {
@@ -104,13 +105,13 @@ const getAllTasksHandler = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const pageNumber = parseInt(page, 10);
     const pageSize = parseInt(limit, 10);
+    
     const skip = (pageNumber - 1) * pageSize;
-
-    const tasks = await Task.find({})
+    const tasks = await Task.find({ visibility: "Published" })
       .skip(skip)
       .limit(pageSize)
       .sort({ createdAt: -1 });
-    const total = await Task.countDocuments({});
+    const total = await Task.countDocuments({ visibility: "Published" });
     
     return res.status(200).json({
       success: true,
@@ -144,6 +145,98 @@ const getTaskCreatorTasksHandler = async (req, res) => {
       message: "Internal Server Error",
       error: error.message,
     })
+  }
+};
+
+const searchAllTasksHandler = async (req, res) => {
+  try {
+    const { error, value } = searchTasksSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: error.details.map((detail) => detail.message),
+      });
+    }
+
+    const {
+      page,
+      limit,
+      datePosted,
+      taskType,
+      search,
+      minApplications,
+      maxApplications,
+      minPay,
+      maxPay,
+    } = value;
+
+    const skip = (page - 1) * limit;
+
+    let filters = { visibility: "Published" };
+
+    if (datePosted) {
+      filters.postedAt = { $gte: new Date(datePosted) };
+    }
+
+    if (taskType) {
+      filters.taskType = taskType;
+    }
+
+    if (search) {
+      filters.title = { $regex: search, $options: "i" };
+    }
+
+    if (minApplications || maxApplications) {
+      filters.noOfRespondents = {};
+      if (minApplications) filters.noOfRespondents.$gte = minApplications;
+      if (maxApplications) filters.noOfRespondents.$lte = maxApplications;
+    }
+
+    if (minPay || maxPay) {
+      filters["compensation.amount"] = {}
+      if (minPay) filters["compensation.amount"].$gte = minPay;
+      if (maxPay) filters["compensation.amount"].$lte = maxPay;
+    }
+
+    const tasks = await Task.find(filters)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Task.countDocuments(filters);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+      pagination: paginate(total, page, limit),
+    });
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Fetch all tasks handler
+const postTaskHandler = async (req, res) => {
+  try { 
+    const { taskId } = req.params;    
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId },
+      { visibility: "Published", postedAt: new Date() },
+      { new: true }
+    );
+    
+    return res.status(200).json({
+      success: true,
+      message: "Task posted successfully!",
+      data: task,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -249,35 +342,6 @@ const getCompletedTasksHandler = async (req, res) => {
   } catch (error) {
     console.error("Error fetching completed tasks:", error);
     res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-
-// Search tasks
- const searchTasksHandler = async (req, res) => {
-  try {
-    const { query } = req.query; // Get the search query
-
-    if (!query) {
-      return res.status(400).json({ status: "FAILED", message: "Search query is required" });
-    }
-
-    // Perform search (case insensitive)
-    const tasks = await Task.find({
-      $or: [
-        { title: { $regex: query, $options: "i" } },
-        { description: { $regex: query, $options: "i" } }
-      ]
-    });
-
-    if (tasks.length === 0) {
-      return res.status(404).json({ status: "FAILED", message: "No tasks found" });
-    }
-
-    res.status(200).json({ status: "SUCCESS", data: tasks });
-
-  } catch (error) {
-    res.status(500).json({ status: "FAILED", message: "Error searching tasks", error: error.message });
   }
 };
 
@@ -425,6 +489,7 @@ module.exports = {
     getTaskCreatorTasksHandler,
     getAvailableTasksHandler,
     getInProgressTasksHandler,
-    searchTasksHandler,
+    searchAllTasksHandler,
+    postTaskHandler,
     getTaskCreatorDashboard,
 };
