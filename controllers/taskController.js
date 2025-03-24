@@ -301,13 +301,36 @@ const getTaskCreatorDashboard = async (req, res) => {
     // Work In Progress (WIP) & Completed Tasks Count
     const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
     const completedTasks = tasks.filter(task => task.status === "completed").length;
-
+   
+    //Task Total
+    const taskTotal ={
+      labels: [
+        "Cancelled", "Pending", "Completed"
+      ],
+      datasets: [
+        tasks.filter(task => task.status === "cancelled").length,
+        tasks.filter(task => task.status === "pending").length,
+        completedTasks
+      ],
+    }
 
     // Spending Over Time (Graph Data & Task Earning Report)
     const spendingOverTime = {
       graphData: tasks.map(task => ({
-        date: task.createdAt,
-        amount: task.compensation.amount || 0,
+          date: task.createdAt,  
+          amount: task.compensation.amount || 0,  
+          category: task.category || "Uncategorized",  
+          status: task.status,  
+          taskTitle: task.title,
+          taskId: task._id,  
+          creatorId: task.userId,  
+          assignedUser: task.assignedTo || "Unassigned",  
+          completionTime: task.completedAt || null,  
+          duration: task.completedAt 
+              ? (new Date(task.completedAt) - new Date(task.createdAt)) / (1000 * 60 * 60) // Duration in hours
+              : null,
+          paymentStatus: task.paymentStatus || "Pending",  
+          earningsByDay: task.earningsByDay || [],  
       })),
       taskEarningReport: {
         allTime: totalAmountSpent,
@@ -353,12 +376,12 @@ const getTaskCreatorDashboard = async (req, res) => {
       doc.text(`Today: $${spendingOverTime.taskEarningReport.today}`).moveDown();
       doc.text("Spending Over Time Graph Data:");
       spendingOverTime.graphData.forEach(entry => {
-        doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}`);
+        doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}, Task: ${entry.taskTitle}, status: ${entry.status}, Category: ${entry.category}, 
+        TaskId: ${entry.taskId}, CreatorId: ${entry.creatorId}, AssignedUser: ${entry.assignedUser}, CompletionTime: ${entry.completionTime},
+        Duration: ${entry.duration}, PaymentStatus: ${entry.paymentStatus}, EarningsByDay: ${entry.earningsByDay}`);
       });
 
-
       doc.end();
-
 
       // Wait for PDF to be created before sending response
       stream.on("finish", () => {
@@ -382,6 +405,7 @@ const getTaskCreatorDashboard = async (req, res) => {
         workInProgressTasks,
         completedTasks,
         spendingOverTime,
+        taskTotal,
       },
     });
   } catch (error) {
@@ -403,5 +427,4 @@ module.exports = {
     getInProgressTasksHandler,
     searchTasksHandler,
     getTaskCreatorDashboard,
-  
 };
