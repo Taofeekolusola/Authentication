@@ -8,7 +8,7 @@ const router = express.Router();
 router.post("/withdraw", validation, handleWithdrawal);
 
 // Endpoint to temporary add wallet balance 
-router.post("add-balance", validation, temporaryAddWalletBalance);
+router.post("/add-balance", validation, temporaryAddWalletBalance);
 
 
 module.exports = router;
