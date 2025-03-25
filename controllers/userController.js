@@ -11,6 +11,7 @@ const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
 const ReferralModel = require("../models/referralModel");
 const { TaskApplication, Task } = require("../models/Tasks");
+const Wallet = require("../models/walletModel");
 const mongoose = require("mongoose");
 
 // Signup for Task Earner
@@ -63,6 +64,12 @@ const SignupHandlerTaskEarner = async (req, res) => {
       } 
     }
 
+    await Wallet.create({
+      userId: newUser._id,
+      email: newUser.email,
+      role: "taskEarner",
+    })
+
     return res.status(201).json({
       success: true,
       message: "Task Earner created!",
@@ -110,6 +117,12 @@ const SignupHandlerTaskCreator = async (req, res) => {
       isTaskCreator: true,
       confirmPassword
     });
+
+    await Wallet.create({
+      userId: newUser._id,
+      email: newUser.email,
+      role: "taskCreator",
+    })
 
     return res.status(201).json({
       success: true,
