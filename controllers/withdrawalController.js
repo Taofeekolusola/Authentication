@@ -235,6 +235,8 @@ const handleWithdrawal = async (req, res) => {
       ...recipientDetails
     });
 
+    console.log("Withdrawal Result:", result);
+
     // Create transaction record
     const transaction = new Transaction({
       userId,
@@ -244,7 +246,8 @@ const handleWithdrawal = async (req, res) => {
       method: gateway,
       paymentType: "withdrawal",
       status: "pending",
-      reference: result.reference
+      // reference: result.reference
+      reference: `WDL_${Date.now()}` // Temporary reference
     });
     await transaction.save();
 
