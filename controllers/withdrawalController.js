@@ -257,4 +257,37 @@ const handleWithdrawal = async (req, res) => {
 };
 
 
-module.exports = { handleWithdrawal };
+// Endpoint to temporarily update the wallet balance for testing
+const temporaryAddWalletBalance = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not logged in" });
+    }
+
+    const { amount } = req.body;
+    if (!amount) return res.status(400).json({ message: "Please input the amount!" })
+
+    if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ success: false, message: "Invalid withdrawal amount!" });
+    }
+
+    // Check user's wallet balance
+    const wallet = await WalletService.getWalletByField({ userId });
+    if (!wallet) {
+      return res.status(400).json({ success: false, message: "Wallet not found!" });
+    }
+
+    wallet.balance += amount;
+    await wallet.save();
+
+    return res.status(200).json({ success: true, message: "Wallet balance updated successfully!", data: wallet });
+
+  } catch (error) {
+    console.error("Withdrawal Error:", error);
+    return res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+  }
+}
+
+
+module.exports = { handleWithdrawal, temporaryAddWalletBalance };
