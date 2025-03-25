@@ -1,5 +1,10 @@
 const Joi = require("joi");
 
+taskType = [
+  "Web Development", "Design", "Review", "Writing",
+  "Product", "Marketing", "Management", "Sales", 
+  "Operations", "Engineering", "Other", "Development"
+]
 const compensationSchema = Joi.alternatives().try(
   Joi.object({
     currency: Joi.string().trim().uppercase().required(),
@@ -23,7 +28,7 @@ const compensationSchema = Joi.alternatives().try(
 
 const createTaskValidationSchema = Joi.object({
   title: Joi.string().trim().required(),
-  taskType: Joi.string().valid("Web Development", "Design", "Review", "Writing").required(),
+  taskType: Joi.string().valid(...taskType).required(),
   description: Joi.string().trim().required(),
   location: Joi.string().valid("Remote", "Onsite").required(),
   deadline: Joi.date().iso().required(),
@@ -37,7 +42,7 @@ const createTaskValidationSchema = Joi.object({
 const updateTaskValidationSchema = Joi.object({
   title: Joi.string().trim().optional(),
   taskType: Joi.string()
-    .valid("Web Development", "Design", "Review", "Writing")
+    .valid(...taskType)
     .optional(),
   description: Joi.string().trim().optional(),
   location: Joi.string().valid("Remote", "Onsite").optional(),
@@ -49,7 +54,21 @@ const updateTaskValidationSchema = Joi.object({
   compensation: compensationSchema.optional(),
 });
 
+const searchTasksSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).default(10),
+  datePosted: Joi.date().iso(), 
+  search: Joi.string().trim().allow(""),
+  minApplications: Joi.number().integer().min(0),
+  maxApplications: Joi.number().integer().min(0),
+  minPay: Joi.number().min(0),
+  maxPay: Joi.number().min(0),
+  taskType: Joi.string().valid(...taskType),
+});
+
 module.exports = {
   createTaskValidationSchema,
   updateTaskValidationSchema,
+  searchTasksSchema,
+  taskType
 }

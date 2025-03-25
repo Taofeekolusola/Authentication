@@ -1,5 +1,10 @@
 const mongoose = require("mongoose");
 
+const taskType = [
+  "Web Development", "Design", "Review", "Writing",
+  "Product", "Marketing", "Management", "Sales", 
+  "Operations", "Engineering", "Other", "Development"
+]
 const TaskSchema = new mongoose.Schema(
   {
     userId: {
@@ -14,13 +19,17 @@ const TaskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
-      enum: ["Web Development", "Design", "Review", "Writing"],
+      enum: taskType,
       required: true,
     },
     visibility: {
       type: String,
       enum: ["Published", "Draft"],
       default: "Draft",
+    },
+    postedAt: {
+      type: Date,
+      default: null,
     },
     link1: {
       type: String,
@@ -54,7 +63,7 @@ const TaskSchema = new mongoose.Schema(
       },
     },
     noOfRespondents: {
-      type: String,
+      type: Number,
       required: true,
     },
     deadline: {
