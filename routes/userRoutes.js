@@ -11,7 +11,8 @@ const {
     getUserProfile,
     updateUserProfile,
     changeAccountSettings,
-    updateUserSettings
+    updateUserSettings,
+    deleteUser,
 } = require('../controllers/userController');
 const upload = require("../middleware/multer");
 
@@ -28,5 +29,6 @@ route.patch('/settings', validation, updateUserSettings);
 route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })
+route.delete('/delete-user', deleteUser);
 
 module.exports = route;

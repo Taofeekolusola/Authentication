@@ -32,7 +32,7 @@ const initiateCheckout = async (req, res) => {
       amount,
       currency,
       method: paymentGateway,
-      paymentType,
+      paymentType: paymentType ?? "fund",
       status: 'pending',
       reference: checkoutResponse.reference,
     });

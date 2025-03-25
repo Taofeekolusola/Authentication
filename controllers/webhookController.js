@@ -143,6 +143,10 @@ const handleStripeWebhook = async (req, res) => {
     }
   } else if (event.type === "payment_intent.payment_failed") {
     await handleChargeFailed({ tx_ref: reference }, "Stripe");
+  } else if (event.type === "payout.paid") {
+    await handleTransferSuccess({ tx_ref: reference }, "Stripe");
+  } else if (event.type === "payout.failed") {
+    await handleTransferFailed({ tx_ref: reference }, "Stripe");
   } else {
     console.log(`Unhandled Stripe event type: ${event.type}`);
     return res.status(200).json({ message: "Unhandled event type" });
@@ -173,6 +177,10 @@ const handlePaypalWebhook = async (req, res) => {
     await handleChargeSuccess({ tx_ref: reference }, "PayPal");
   } else if (eventType === "PAYMENT.CAPTURE.DENIED" || eventType === "PAYMENT.CAPTURE.FAILED") {
     await handleChargeFailed({ tx_ref: reference }, "PayPal");
+  } else if (eventType === "PAYMENT.PAYOUTSBATCH.SUCCESS") {
+    await handleTransferSuccess({ tx_ref: reference }, "PayPal");
+  } else if (eventType === "PAYMENT.PAYOUTSBATCH.DENIED") {
+    await handleTransferFailed({ tx_ref: reference }, "PayPal");
   } else {
     console.log(`Unhandled PayPal event type: ${eventType}`);
     return res.status(200).json({ status: "success", message: "Event unhandled" });
@@ -208,6 +216,10 @@ const handleWiseWebhook = async (req, res) => {
     await handleChargeSuccess({ tx_ref: reference }, "Wise");
   } else if (event.status === "failed") {
     await handleChargeFailed({ tx_ref: reference }, "Wise");
+  } else if (event.status === "funds_paid_out") {
+    await handleTransferSuccess({ tx_ref: reference }, "Wise");
+  } else if (event.status === "failed") {
+    await handleTransferFailed({ tx_ref: reference }, "Wise");
   } else {
     console.log(`Unhandled Wise event status: ${event.status}`);
     return res.status(200).json({ status: "success", message: "Event unhandled" });
@@ -324,7 +336,7 @@ const handleChargeFailed = async (data, gateway) => {
 const handleTransferSuccess = async (data, gateway) => {
   console.log(`Handling transfer success from ${gateway}:`, data);
   try {
-    const transferRecord = await transferModel.findOne({ reference: data.tx_ref });
+    const transferRecord = await Transaction.findOne({ reference: data.tx_ref });
     if (!transferRecord) {
       console.error(`Transfer record not found for reference: ${data.tx_ref}`);
       return;
@@ -365,7 +377,7 @@ const handleTransferSuccess = async (data, gateway) => {
 const handleTransferFailed = async (data, gateway) => {
   console.log(`Handling transfer failed from ${gateway}:`, data);
   try {
-    const transferRecord = await transferModel.findOne({ reference: data.tx_ref });
+    const transferRecord = await Transaction.findOne({ reference: data.tx_ref });
     if (!transferRecord) {
       console.error(`Transfer record not found for reference: ${data.tx_ref}`);
       return;
