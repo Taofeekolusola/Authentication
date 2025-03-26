@@ -1,10 +1,6 @@
 const mongoose = require("mongoose");
+const { taskType } = require("../validations/taskValidation");
 
-const taskType = [
-  "Web Development", "Design", "Review", "Writing",
-  "Product", "Marketing", "Management", "Sales", 
-  "Operations", "Engineering", "Other", "Development"
-]
 const TaskSchema = new mongoose.Schema(
   {
     userId: {
