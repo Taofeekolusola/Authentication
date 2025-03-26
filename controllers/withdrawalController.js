@@ -257,7 +257,7 @@ const handleWithdrawal = async (req, res) => {
       method: gateway,
       paymentType: "withdrawal",
       status: "pending",
-      reference: result.reference
+      reference: result.reference || `WDL_${Date.now()}`
     });
     await transaction.save();
 
