@@ -162,7 +162,15 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY); // Load Stripe 
 const PAYMENT_GATEWAYS = {
   "flutterwave": { requiredFields: ["bankCode", "accountNumber"] },
   "paypal": { requiredFields: ["paypalEmail"] },
-  "wise": { requiredFields: ["recipientId"] },
+  "wise": { 
+    requiredFieldsByCurrency: {
+      "NGN": ["accountHolderName", "accountNumber", "bankCode"], // Nigerian banks use bank code
+      "USD": ["accountHolderName", "accountNumber", "routingNumber"], // U.S. banks use routing number
+      "GBP": ["accountHolderName", "accountNumber", "sortCode"], // UK banks use sort code
+      "EUR": ["accountHolderName", "accountNumber", "IBAN"], // European banks use IBAN
+    },
+    alternativeFields: ["recipientId"] // Allows Wise Recipient ID instead
+  },
   "stripe-connect": { requiredFields: ["stripeAccountId"] }, // Stripe Connect Payout
   "stripe-bank": { requiredFields: ["accountNumber", "routingNumber", "accountHolderName"] } // Direct U.S. Bank Payout
 };
@@ -198,14 +206,28 @@ const handleWithdrawal = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid withdrawal amount!" });
     }
 
-    // Validate recipient details based on the selected gateway
-    const requiredFields = PAYMENT_GATEWAYS[gateway].requiredFields;
-    for (const field of requiredFields) {
-      if (!recipientDetails[field]) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Missing required field: ${field} for ${gateway}` 
+    // Handle Wise gateway separately (supports multiple field types)
+    if (gateway === "wise") {
+      const requiredWiseFields = PAYMENT_GATEWAYS[gateway].requiredFieldsByRegion || [];
+      const hasBankDetails = requiredWiseFields.every(field => recipientDetails[field]);
+      const hasRecipientId = recipientDetails.recipientId;
+
+      if (!hasBankDetails && !hasRecipientId) {
+        return res.status(400).json({
+          success: false,
+          message: `Wise withdrawal requires either a recipientId or full bank details: ${requiredWiseFields.join(", ")}`
         });
+      }
+    } else {
+      // Validate recipient details based on the selected gateway
+      const requiredFields = PAYMENT_GATEWAYS[gateway].requiredFields;
+      for (const field of requiredFields) {
+        if (!recipientDetails[field]) {
+          return res.status(400).json({
+            success: false,
+            message: `Missing required field: ${field} for ${gateway}`
+          });
+        }
       }
     }
 

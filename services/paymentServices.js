@@ -40,22 +40,22 @@ class BasePaymentService {
 
   async resolveBankAccountForStripe(accountNumber, routingNumber) {
     try {
-      const bankAccount = await this.stripe.tokens.create({
-        bank_account: {
-          country: "US",
-          currency: "usd",
-          account_holder_type: "individual",
-          routing_number: routingNumber,
-          account_number: accountNumber
-        }
-      });
+        const bankToken = await this.stripe.tokens.create({
+            bank_account: {
+                country: "US",
+                currency: "usd",
+                account_holder_type: "individual",
+                routing_number: routingNumber,
+                account_number: accountNumber
+            }
+        });
 
-      return { success: true, bankAccount };
+        return { success: true, bankTokenId: bankToken.id };
     } catch (error) {
-      console.error("Stripe Bank Account Validation Error:", error);
-      return { success: false, message: error.message };
+        console.error("Stripe Bank Account Validation Error:", error);
+        return { success: false, message: error.message };
     }
-  }
+}
 }
 
 
@@ -228,18 +228,32 @@ class WithdrawalService extends BasePaymentService {
 
   async handleStripeBankWithdrawal(withdrawalData) {
     const { accountNumber, routingNumber, amount, currency } = withdrawalData;
-    const bankValidation = await this.resolveBankAccountForStripe(accountNumber, routingNumber);
-    if (!bankValidation.success) throw new Error(bankValidation.message);
 
+    let payoutRecipient;
+
+        // ✅ Validate & Tokenize Bank Account
+        const bankValidation = await this.resolveBankAccountForStripe(accountNumber, routingNumber);
+        if (!bankValidation.success) throw new Error(bankValidation.message);
+
+        // ✅ Create a bank account for payout
+        const bankAccount = await this.stripe.accounts.createExternalAccount(
+            process.env.STRIPE_PLATFORM_ACCOUNT, 
+            { external_account: bankValidation.bankTokenId }
+        );
+
+        payoutRecipient = bankAccount.id;
+
+    // ✅ Initiate the payout
     const payout = await this.stripe.payouts.create({
-      amount: Math.round(amount * 100),
-      currency: currency.toLowerCase(),
-      method: "standard",
-      destination: bankValidation.bankAccount.id
+        amount: Math.round(amount * 100),
+        currency: currency.toLowerCase(),
+        method: "standard",
+        destination: payoutRecipient
     });
 
     return { success: true, id: payout.id, status: payout.status, reference: payout.id };
-  }
+}
+
 
   async handlePaypalWithdrawal(withdrawalData) {
     const request = new paypal.payouts.PayoutsPostRequest();
@@ -267,16 +281,57 @@ class WithdrawalService extends BasePaymentService {
   }
 
   async handleWiseWithdrawal(withdrawalData) {
-    const transferPayload = {
-      targetAccount: withdrawalData.wiseRecipientId,
-      sourceCurrency: withdrawalData.currency,
-      targetCurrency: withdrawalData.currency,
-      amount: withdrawalData.amount,
-      reference: "Wallet Withdrawal",
-    };
-    const response = await this.wiseAPI.post("/transfers", transferPayload);
-    return response.data;
-  }
+    try {
+        // Step 1: Check if recipientId is provided, otherwise create a recipient
+        let recipientId = withdrawalData.recipientId;
+
+        if (!recipientId) {
+            const recipientPayload = {
+                accountHolderName: withdrawalData.accountHolderName,
+                currency: withdrawalData.currency,
+                type: withdrawalData.sortCode
+                    ? "sort_code"
+                    : withdrawalData.routingNumber
+                    ? "aba"
+                    : withdrawalData.IBAN
+                    ? "iban"
+                    : withdrawalData.bankCode
+                    ? "nuban" // Nigerian banks use NUBAN format
+                    : null,
+                details: {
+                    sortCode: withdrawalData.sortCode || undefined, // UK Banks
+                    routingNumber: withdrawalData.routingNumber || undefined, // US Banks
+                    IBAN: withdrawalData.IBAN || undefined, // EU Banks
+                    bankCode: withdrawalData.bankCode || undefined, // NGN Banks
+                    accountNumber: withdrawalData.accountNumber
+                }
+            };
+
+            if (!recipientPayload.type) {
+                throw new Error("Missing required bank details for Wise recipient.");
+            }
+
+            const recipientResponse = await this.wiseAPI.post("/v1/accounts", recipientPayload);
+            recipientId = recipientResponse.data.id; // Extract Wise recipient ID
+        }
+
+        // Step 2: Initiate the Transfer
+        const transferPayload = {
+            targetAccount: recipientId,
+            sourceCurrency: withdrawalData.currency,
+            targetCurrency: withdrawalData.currency,
+            amount: withdrawalData.amount,
+            reference: "Wallet Withdrawal"
+        };
+
+        const transferResponse = await this.wiseAPI.post("/v1/transfers", transferPayload);
+        return transferResponse.data;
+
+    } catch (error) {
+        console.error("Wise Withdrawal Error:", error);
+        throw new Error(error.response?.data?.message || "Withdrawal failed");
+    }
+}
 }
 
   // constructor() {
