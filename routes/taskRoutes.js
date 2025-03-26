@@ -6,17 +6,13 @@ const {
   deleteTaskHandler,
   getAllTasksHandler,
   getTaskCreatorTasksHandler,
-<<<<<<< HEAD
-  getCompletedTasksHandler,
-  getTaskCreatorAmountSpentHandler,
-  getAvailableTasksHandler,
-  getInProgressTasksHandler,
-  getTaskApplicationsHandler,
-=======
   searchAllTasksHandler,
   postTaskHandler,
   getTaskCreatorDashboard,
->>>>>>> fa70f34d416bfedb3283db02e0d8fe5a67e62ca0
+  getInProgressTasksHandler,
+  getCompletedTasksHandler,
+  getTaskCreatorAmountSpentHandler,
+  getAvailableTasksHandler,
 } = require("../controllers/taskController");
 const upload = require("../middleware/multer");
 const isTaskCreator = require("../middleware/isTaskCreator");
@@ -42,16 +38,17 @@ route.patch("/:taskId", validation, isTaskCreator, taskOwner, upload.single('add
 route.delete("/:taskId", validation, isTaskCreator, taskOwner, deleteTaskHandler);
 route.get("/all", validation, isTaskEarner, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
-<<<<<<< HEAD
-route.get("/completed", validation, isTaskEarner, getCompletedTasksHandler);
-route.get("/inProgress", validation, isTaskEarner, getInProgressTasksHandler);
-=======
 route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard)
+
+// Get all completed tasks (earner)
+route.get("/completed", validation, isTaskEarner, getCompletedTasksHandler);
+
+// Get all tasks in progress (earner)
+route.get("/in-progress", validation, isTaskEarner, getInProgressTasksHandler);
 
 
 // Search for available tasks (earner)
 route.post("/search", validation, isTaskEarner, searchAllTasksHandler);
->>>>>>> fa70f34d416bfedb3283db02e0d8fe5a67e62ca0
 
 // Post an already created task (creator)
 route.patch("/:taskId/post", validation, isTaskCreator, taskOwner, postTaskHandler);
