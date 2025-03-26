@@ -11,7 +11,9 @@ const {
     getUserProfile,
     updateUserProfile,
     changeAccountSettings,
-    updateUserSettings
+    updateUserSettings,
+    amountEarned,
+  
 } = require('../controllers/userController');
 const upload = require("../middleware/multer");
 
@@ -25,6 +27,7 @@ route.get('/user-profile', validation, getUserProfile);
 route.put('/profile', upload.single('avatar'), validation, updateUserProfile);
 route.put('/account-settings', validation, changeAccountSettings);
 route.patch('/settings', validation, updateUserSettings);
+route.get('/amount-earned', validation, amountEarned)
 route.post('/user', validation, (req, res) => {
     res.json(req.user)
 })

@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
 const { TaskApplication } = require("../models/Tasks");
-const mongoose = require("mongoose");
 
 
 // const createTaskHandler = async (req, res) => {
