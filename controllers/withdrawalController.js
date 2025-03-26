@@ -227,6 +227,17 @@ const handleWithdrawal = async (req, res) => {
       return res.status(400).json({ success: false, message: "Insufficient wallet balance!" });
     }
 
+    
+    // Convert USD to NGN and Check user's wallet balance
+    let newAmount;
+    if (gateway === "stripe-connect" || gateway === "stripe-bank") {
+      newAmount = await convertUsdToNgn(amount); // Wait for the conversion to complete
+      console.log(`Amount in NGN: ${newAmount}`);
+    if (!wallet || wallet.balance < newAmount) {
+      return res.status(400).json({ success: false, message: "Insufficient wallet balance!" });
+    }
+  }
+
     // Process withdrawal via service
     const result = await withdrawalService.processWithdrawal({
       gateway,
@@ -241,7 +252,7 @@ const handleWithdrawal = async (req, res) => {
     const transaction = new Transaction({
       userId,
       email: user.email,
-      amount,
+      newAmount,
       currency,
       method: gateway,
       paymentType: "withdrawal",

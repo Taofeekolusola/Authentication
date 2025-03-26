@@ -344,10 +344,22 @@ const handleTransferSuccess = async (data, gateway) => {
     transferRecord.status = "successful";
     await transferRecord.save();
 
+    let amount = transferRecord.amount;
+
     // Update the user's wallet balance and add the transaction
     const wallet = await Wallet.findOne({ userId: transferRecord.userId });
     if (wallet) {
-      wallet.balance -= transferRecord.amount; // Deduct the amount for transfers
+          // Convert USD to NGN if the gateway is Stripe
+    if (gateway === "Stripe") {
+      try {
+        amount = await convertUsdToNgn(amount); // Wait for the conversion to complete
+        console.log(`Amount in NGN: ${amount}`);
+      } catch (error) {
+        console.error("Error converting USD to NGN:", error);
+      }
+    }
+
+      wallet.balance -= amount; // Deduct the amount for transfers
       wallet.transactions.push(transferRecord._id);
       await wallet.save();
     }
