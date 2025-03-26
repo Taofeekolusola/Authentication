@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const axios = require("axios");
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const ms = require('ms');
 const dotenv = require("dotenv");
 dotenv.config();

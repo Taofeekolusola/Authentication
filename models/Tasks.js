@@ -1,13 +1,10 @@
 const mongoose = require("mongoose");
 
-const AdditionalInfoSchema = new mongoose.Schema(
-  {
-    type: { type: String, required: true }, // e.g., "file", "url", "image"
-    value: { type: String, required: true }, // Stores file path, URL, or image link
-  },
-  { _id: false } // Prevents Mongoose from automatically creating an _id for each object
-);
-
+const taskType = [
+  "Web Development", "Design", "Review", "Writing",
+  "Product", "Marketing", "Management", "Sales", 
+  "Operations", "Engineering", "Other", "Development"
+]
 const TaskSchema = new mongoose.Schema(
   {
     userId: {
@@ -22,7 +19,17 @@ const TaskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
+      enum: taskType,
       required: true,
+    },
+    visibility: {
+      type: String,
+      enum: ["Published", "Draft"],
+      default: "Draft",
+    },
+    postedAt: {
+      type: Date,
+      default: null,
     },
     link1: {
       type: String,
@@ -56,7 +63,7 @@ const TaskSchema = new mongoose.Schema(
       },
     },
     noOfRespondents: {
-      type: String,
+      type: Number,
       required: true,
     },
     deadline: {
@@ -68,8 +75,8 @@ const TaskSchema = new mongoose.Schema(
       required: true,
     },
     additionalInfo: {
-      type: [AdditionalInfoSchema],
-      default: [],
+      type: String,
+      default: "",
     },
   },
   {

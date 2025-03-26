@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const paginate = require("../utils/paginate");
+<<<<<<< HEAD
 const { TaskApplication } = require("../models/Tasks");
 
 
@@ -82,89 +83,38 @@ const { TaskApplication } = require("../models/Tasks");
 //     res.status(500).json({ message: "Internal Server Error", error: error.message });
 //   }
 // };
+=======
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
+>>>>>>> fa70f34d416bfedb3283db02e0d8fe5a67e62ca0
 
+const {
+  createTaskValidationSchema,
+  updateTaskValidationSchema,
+  searchTasksSchema
+} = require("../validations/taskValidation");
 
 const createTaskHandler = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const {
-      title,
-      requirements,
-      description,
-      compensation,
-      noOfRespondents,
-      deadline,
-      link1,
-      taskType,
-      location,
-      link2,
-      additionalInfo, // Could be undefined
-    } = req.body;
-
-    // Validate required fields
-    if (!title || !description || !requirements || !deadline || !compensation || !taskType || !location) {
-      return res.status(400).json({ error: "Missing required field." });
+    const taskCreatorId = req.user._id;
+    const { error, value } = createTaskValidationSchema.validate(req.body, {
+      abortEarly: false,
+      allowUnknown: true,
+    });
+    if (error) {
+      return res.status(400).json({ error: error.details.map((d) => d.message) });
     }
 
-    // Validate compensation format
-    let parsedCompensation;
-    try {
-      parsedCompensation = typeof compensation === "string" ? JSON.parse(compensation) : compensation;
-      if (!parsedCompensation.currency || !parsedCompensation.amount) {
-        return res.status(400).json({ error: "Invalid compensation format." });
-      }
-      parsedCompensation = {
-        currency: parsedCompensation.currency.toUpperCase(),
-        amount: Number(parsedCompensation.amount),
-      };
-    } catch (error) {
-      return res.status(400).json({ error: "Invalid JSON format in compensation." });
-    }
-
-    let additionalInfoArray = [];
-
-    // ✅ Handle uploaded files
-    if (req.files && req.files.length > 0) {
-      additionalInfoArray.push(
-        ...req.files.map((file) => ({ type: "file", value: `/uploads/${file.filename}` }))
-      );
-    }
-
-    // ✅ Parse `additionalInfo` safely
-    if (additionalInfo) {
-      try {
-        const parsedAdditionalInfo = JSON.parse(additionalInfo);
-        if (Array.isArray(parsedAdditionalInfo)) {
-          additionalInfoArray.push(...parsedAdditionalInfo);
-        } else {
-          return res.status(400).json({ error: "additionalInfo must be an array." });
-        }
-      } catch (error) {
-        return res.status(400).json({ error: "Invalid JSON format in additionalInfo." });
-      }
-    }
-
-    // ✅ Prevent empty `additionalInfo` errors
-    if (!additionalInfoArray.length) {
-      additionalInfoArray = [{ type: "note", value: "No additional info provided" }];
-    }
+    let additionalInfo = req.file ? req.file.path : "";
 
     const task = await Task.create({
-      userId,
-      title,
-      description,
-      link1,
-      taskType,
-      deadline,
-      noOfRespondents,
-      compensation: parsedCompensation,
-      link2,
-      additionalInfo: additionalInfoArray,
-      location,
-      requirements,
+      userId: taskCreatorId,
+      ...value,
+      additionalInfo,
     });
 
-    res.status(201).json({ success: true, message: "Task created successfully!", task });
+    res.status(201).json({ status: true, message: "Task created successfully!", task });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
@@ -172,46 +122,55 @@ const createTaskHandler = async (req, res) => {
 
 // Update Task Handler
 const updateTaskHandler = async (req, res) => {
-  const { taskId } = req.params;
-  const updatedData = req.body;
   try {
-    if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      res.status.json(400).json("Invalid Task ID");
+    const { taskId } = req.params;
+    const updateData = { ...req.body };
+
+    const { error, value } = updateTaskValidationSchema.validate(updateData, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ status: false, errors: error.details.map((d) => d.message) });
     }
 
     const task = await Task.findById(taskId);
     if (!task) {
-      res.status(404).json("Task not found");
+      return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    await task.updateOne(updatedData);
+    if (req.file) {
+      if (task.additionalInfo) {
+        try {
+          fs.unlinkSync(task.additionalInfo);
+        } catch (err) {
+          console.error("File deletion error:", err.message);
+        }
+      }
+      value.additionalInfo = req.file.path;
+    }
+
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      value,
+      { new: true, runValidators: true }
+    );
+
     res.status(200).json({
       success: true,
       message: "Task updated successfully!",
-      task: { ...task.toObject(), ...updatedData },
+      task: updatedTask,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
-    })
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" })
   }
 };
 
-// Delete Task Handler
 const deleteTaskHandler = async (req, res) => {
-  const { taskId } = req.params;
   try {
-    if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      res.status(400).json("Invalid Task ID");
-    }
-
-    const task = await Task.findById(taskId);
+    const task = await Task.findByIdAndDelete(req.params.taskId);
     if (!task) {
-      res.status(404).json("Task not found");
+      return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    await task.deleteOne();
     res.status(200).json({
       success: true,
       message: "Task deleted successfully!",
@@ -220,7 +179,7 @@ const deleteTaskHandler = async (req, res) => {
     res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
-    })
+    });
   }
 };
 
@@ -230,13 +189,13 @@ const getAllTasksHandler = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const pageNumber = parseInt(page, 10);
     const pageSize = parseInt(limit, 10);
+    
     const skip = (pageNumber - 1) * pageSize;
-
-    const tasks = await Task.find({})
+    const tasks = await Task.find({ visibility: "Published" })
       .skip(skip)
       .limit(pageSize)
       .sort({ createdAt: -1 });
-    const total = await Task.countDocuments({});
+    const total = await Task.countDocuments({ visibility: "Published" });
     
     return res.status(200).json({
       success: true,
@@ -270,6 +229,98 @@ const getTaskCreatorTasksHandler = async (req, res) => {
       message: "Internal Server Error",
       error: error.message,
     })
+  }
+};
+
+const searchAllTasksHandler = async (req, res) => {
+  try {
+    const { error, value } = searchTasksSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: error.details.map((detail) => detail.message),
+      });
+    }
+
+    const {
+      page,
+      limit,
+      datePosted,
+      taskType,
+      search,
+      minApplications,
+      maxApplications,
+      minPay,
+      maxPay,
+    } = value;
+
+    const skip = (page - 1) * limit;
+
+    let filters = { visibility: "Published" };
+
+    if (datePosted) {
+      filters.postedAt = { $gte: new Date(datePosted) };
+    }
+
+    if (taskType) {
+      filters.taskType = taskType;
+    }
+
+    if (search) {
+      filters.title = { $regex: search, $options: "i" };
+    }
+
+    if (minApplications || maxApplications) {
+      filters.noOfRespondents = {};
+      if (minApplications) filters.noOfRespondents.$gte = minApplications;
+      if (maxApplications) filters.noOfRespondents.$lte = maxApplications;
+    }
+
+    if (minPay || maxPay) {
+      filters["compensation.amount"] = {}
+      if (minPay) filters["compensation.amount"].$gte = minPay;
+      if (maxPay) filters["compensation.amount"].$lte = maxPay;
+    }
+
+    const tasks = await Task.find(filters)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Task.countDocuments(filters);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tasks fetched successfully!",
+      data: tasks,
+      pagination: paginate(total, page, limit),
+    });
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Fetch all tasks handler
+const postTaskHandler = async (req, res) => {
+  try { 
+    const { taskId } = req.params;    
+    const task = await Task.findOneAndUpdate(
+      { _id: taskId },
+      { visibility: "Published", postedAt: new Date() },
+      { new: true }
+    );
+    
+    return res.status(200).json({
+      success: true,
+      message: "Task posted successfully!",
+      data: task,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -378,6 +429,116 @@ const getCompletedTasksHandler = async (req, res) => {
   }
 };
 
+const getTaskCreatorDashboard = async (req, res) => {
+  try {
+    const { userId, exportPdf } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+
+    // Fetch all tasks created by the user
+    const tasks = await Task.find({ userId });
+
+
+    // Calculate Amount Spent
+    const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
+
+
+    // Work In Progress (WIP) & Completed Tasks Count
+    const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
+    const completedTasks = tasks.filter(task => task.status === "completed").length;
+
+
+    // Spending Over Time (Graph Data & Task Earning Report)
+    const spendingOverTime = {
+      graphData: tasks.map(task => ({
+        date: task.createdAt,
+        amount: task.compensation.amount || 0,
+      })),
+      taskEarningReport: {
+        allTime: totalAmountSpent,
+        last30Days: tasks
+          .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
+        last7Days: tasks
+          .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
+        today: tasks
+          .filter(task => new Date(task.createdAt).toDateString() === new Date().toDateString())
+          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
+      },
+    };
+
+
+    // If exportPdf is requested, generate and return a PDF
+    if (exportPdf === "true") {
+      const exportsDir = path.join(__dirname, "../exports");
+
+
+      // Ensure the "exports" directory exists
+      if (!fs.existsSync(exportsDir)) {
+        fs.mkdirSync(exportsDir, { recursive: true });
+      }
+
+      const pdfFileName = `spending_over_time_${userId}.pdf`;
+      const pdfPath = path.join(exportsDir, pdfFileName);
+      const doc = new PDFDocument();
+      const stream = fs.createWriteStream(pdfPath);
+      doc.pipe(stream);
+
+
+      // PDF Content
+      doc.fontSize(18).text("Spending Over Time Report", { align: "center" }).moveDown();
+      doc.fontSize(14).text(`Total Amount Spent: $${totalAmountSpent}`);
+      doc.text(`Work In Progress Tasks: ${workInProgressTasks}`);
+      doc.text(`Completed Tasks: ${completedTasks}`).moveDown();
+      doc.text("Task Earning Report:");
+      doc.text(`All Time: $${spendingOverTime.taskEarningReport.allTime}`);
+      doc.text(`Last 30 Days: $${spendingOverTime.taskEarningReport.last30Days}`);
+      doc.text(`Last 7 Days: $${spendingOverTime.taskEarningReport.last7Days}`);
+      doc.text(`Today: $${spendingOverTime.taskEarningReport.today}`).moveDown();
+      doc.text("Spending Over Time Graph Data:");
+      spendingOverTime.graphData.forEach(entry => {
+        doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}`);
+      });
+
+
+      doc.end();
+
+
+      // Wait for PDF to be created before sending response
+      stream.on("finish", () => {
+        const pdfUrl = `http://yourserver.com/exports/${pdfFileName}`;
+        return res.status(200).json({
+          success: true,
+          message: "PDF generated successfully",
+          pdfUrl, // Send the URL instead of the file
+        });
+      });
+    
+    
+      return;
+    }
+  
+    // Return JSON response
+    res.status(200).json({
+      success: true,
+      dashboardData: {
+        totalAmountSpent,
+        workInProgressTasks,
+        completedTasks,
+        spendingOverTime,
+      },
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+  }
+};
+
+
 module.exports = {
     createTaskHandler,
     updateTaskHandler,
@@ -387,6 +548,9 @@ module.exports = {
     getTaskCreatorAmountSpentHandler,
     getTaskCreatorTasksHandler,
     getAvailableTasksHandler,
-    getInProgressTasksHandler
+    getInProgressTasksHandler,
+    searchAllTasksHandler,
+    postTaskHandler,
+    getTaskCreatorDashboard,
   
 };
