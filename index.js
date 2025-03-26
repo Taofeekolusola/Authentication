@@ -6,6 +6,7 @@ const userRoutes = require('./routes/userRoutes');
 const multer = require('multer');
 const taskRoutes = require('./routes/taskRoutes');
 const paymentRoute = require("./routes/paymentRoute");
+const withdrawalRoute = require("./routes/withdrawalRoute");
 const webhookRoute = require("./routes/webhookRoute");
 const authRoutes = require("./routes/authRoutes");
 const referralRoutes = require("./routes/referralRoutes");
@@ -90,6 +91,7 @@ app.get('/', async (req, res) => {
 app.use('/users', userRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1', paymentRoute);
+app.use('/api/v1', withdrawalRoute);
 app.use('/api/v1/webhooks', webhookRoute);
 app.use('/api/v1/auth', authRoutes);
 app.use("/api/v1/referrals", referralRoutes);

@@ -9,6 +9,10 @@ const {
   searchAllTasksHandler,
   postTaskHandler,
   getTaskCreatorDashboard,
+  getInProgressTasksHandler,
+  getCompletedTasksHandler,
+  getTaskCreatorAmountSpentHandler,
+  getAvailableTasksHandler,
 } = require("../controllers/taskController");
 const upload = require("../middleware/multer");
 const isTaskCreator = require("../middleware/isTaskCreator");
@@ -19,7 +23,9 @@ const {
   updateReviewStatus,
   updateEarnerStatus,
   fetchAllApplicationsEarner,
-  fetchAllApplicationsCreator
+  fetchAllApplicationsCreator,
+  fetchFeaturedApplicationsEarner,
+  fetchFeaturedApplicationsCreator
 } = require("../controllers/taskApplicationController");
 const isApplicationOwner = require("../middleware/isApplicationOwner");
 const isTaskOwner = require("../middleware/isTaskOwner");
@@ -33,6 +39,13 @@ route.delete("/:taskId", validation, isTaskCreator, taskOwner, deleteTaskHandler
 route.get("/all", validation, isTaskEarner, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
 route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard)
+
+// Get all completed tasks (earner)
+route.get("/completed", validation, isTaskEarner, getCompletedTasksHandler);
+
+// Get all tasks in progress (earner)
+route.get("/in-progress", validation, isTaskEarner, getInProgressTasksHandler);
+
 
 // Search for available tasks (earner)
 route.post("/search", validation, isTaskEarner, searchAllTasksHandler);
@@ -58,6 +71,12 @@ route.post("/applications/earner", validation, isTaskEarner, fetchAllApplication
 
 //Get all task applications for a creator
 route.post("/applications/creator", validation, isTaskCreator, fetchAllApplicationsCreator);
+
+// Fetch uncompleted tasks for earner
+route.get("/applications/featured/earner", validation, isTaskEarner, fetchFeaturedApplicationsEarner);
+
+// Fetch uncompleted tasks for creator
+route.get("/applications/featured/creator", validation, isTaskCreator, fetchFeaturedApplicationsCreator);
 
 
 module.exports = route;

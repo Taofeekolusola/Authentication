@@ -11,6 +11,7 @@ const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
 const ReferralModel = require("../models/referralModel");
 const { TaskApplication, Task } = require("../models/Tasks");
+const Wallet = require("../models/walletModel");
 const mongoose = require("mongoose");
 
 // Signup for Task Earner
@@ -63,6 +64,12 @@ const SignupHandlerTaskEarner = async (req, res) => {
       } 
     }
 
+    await Wallet.create({
+      userId: newUser._id,
+      email: newUser.email,
+      role: "taskEarner",
+    })
+
     return res.status(201).json({
       success: true,
       message: "Task Earner created!",
@@ -110,6 +117,12 @@ const SignupHandlerTaskCreator = async (req, res) => {
       isTaskCreator: true,
       confirmPassword
     });
+
+    await Wallet.create({
+      userId: newUser._id,
+      email: newUser.email,
+      role: "taskCreator",
+    })
 
     return res.status(201).json({
       success: true,
@@ -597,6 +610,37 @@ const amountEarned = async (req, res) => {
   }
 }
 
+
+const deleteUser = async (req, res) => {
+  try {
+    const email = req.body.email.toLowerCase().trim();
+
+    //valid email dormain address
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format!" });
+    }
+    
+    const existingUser = await User.findOne({ email }).exec();
+    if (!existingUser) {
+      return res.status(400).json({ message: "User not found!" });
+    }
+
+    const deleteUser = await User.findByIdAndDelete(existingUser._id)
+    if (!deleteUser) {
+      return res.status(400).json({ message: "Unable to delete user!" });
+    };
+
+    return res.status(200).json({ message: "User deleted successfully!" });
+
+  } catch (error) {
+    console.error("An error occurred:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+
+
 module.exports = {
   SignupHandlerTaskCreator,
   SignupHandlerTaskEarner,
@@ -608,5 +652,6 @@ module.exports = {
   updateUserProfile,
   changeAccountSettings,
   updateUserSettings,
-  amountEarned
+  amountEarned,
+  deleteUser,
 };

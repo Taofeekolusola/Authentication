@@ -9,7 +9,7 @@ dotenv.config();
 
 const FRONTEND_URL = `https://altbucks-ipat.vercel.app`;
 
-class PaymentService {
+class BasePaymentService {
   constructor() {
     this.flutterwaveAPI = axios.create({
       baseURL: "https://api.flutterwave.com/v3",
@@ -19,12 +19,10 @@ class PaymentService {
       }
     });
 
-    // Initialize Stripe SDK
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2025-01-27.acacia',
     });
 
-    // Initialize PayPal SDK (using the Sandbox environment for testing)
     const environment = new paypal.core.SandboxEnvironment(
       process.env.PAYPAL_CLIENT_ID,
       process.env.PAYPAL_CLIENT_SECRET
@@ -32,13 +30,38 @@ class PaymentService {
     this.paypalClient = new paypal.core.PayPalHttpClient(environment);
 
     this.wiseAPI = axios.create({
-      // baseURL: "https://api.wise.com/v1",
-      baseURL: "https://api.sandbox.transferwise.tech/v1", // Use Wise Sandbox API
+      baseURL: "https://api.sandbox.transferwise.tech/v1",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.WISE_API_KEY}`
       }
     });
+  }
+
+  async resolveBankAccountForStripe(accountNumber, routingNumber) {
+    try {
+      const bankAccount = await this.stripe.tokens.create({
+        bank_account: {
+          country: "US",
+          currency: "usd",
+          account_holder_type: "individual",
+          routing_number: routingNumber,
+          account_number: accountNumber
+        }
+      });
+
+      return { success: true, bankAccount };
+    } catch (error) {
+      console.error("Stripe Bank Account Validation Error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+}
+
+
+class PaymentService extends BasePaymentService {
+  constructor() {
+    super();
   }
 
   /**
@@ -146,6 +169,301 @@ class PaymentService {
 }
 
 
+
+class WithdrawalService extends BasePaymentService {
+  constructor() {
+    super();
+  }
+
+  async processWithdrawal(withdrawalData) {
+    try {
+      switch (withdrawalData.gateway) {
+        case 'flutterwave':
+          return await this.handleFlutterwaveWithdrawal(withdrawalData);
+        case 'stripe-connect':
+          return await this.handleStripeConnectWithdrawal(withdrawalData);
+        case 'stripe-bank':
+          return await this.handleStripeBankWithdrawal(withdrawalData);
+        case 'paypal':
+          return await this.handlePaypalWithdrawal(withdrawalData);
+        case 'wise':
+          return await this.handleWiseWithdrawal(withdrawalData);
+        default:
+          throw new Error("Invalid withdrawal gateway selected");
+      }
+    } catch (error) {
+      console.error("Withdrawal Error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  async handleFlutterwaveWithdrawal(withdrawalData) {
+    const { bankCode, accountNumber, amount, currency } = withdrawalData;
+    const payload = {
+      account_bank: bankCode,
+      account_number: accountNumber,
+      amount: amount,
+      narration: "Wallet Withdrawal",
+      currency: currency,
+      reference: `WDL_${Date.now()}`,
+      debit_currency: currency,
+    };
+    const response = await this.flutterwaveAPI.post("/transfers", payload);
+    // return response.data;
+    return {
+      success: response.data.status === "success", reference: response.data.data.reference, id: response.data.data.id, status: response.data.data.status, data: response.data.data };
+  }
+
+  async handleStripeConnectWithdrawal(withdrawalData) {
+    const { stripeAccountId, amount, currency } = withdrawalData;
+    const payout = await this.stripe.transfers.create({
+      amount: Math.round(amount * 100),
+      currency: currency.toLowerCase(),
+      destination: stripeAccountId,
+      transfer_group: `withdrawal_${Date.now()}`
+    });
+
+    return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+  }
+
+  async handleStripeBankWithdrawal(withdrawalData) {
+    const { accountNumber, routingNumber, amount, currency } = withdrawalData;
+    const bankValidation = await this.resolveBankAccountForStripe(accountNumber, routingNumber);
+    if (!bankValidation.success) throw new Error(bankValidation.message);
+
+    const payout = await this.stripe.payouts.create({
+      amount: Math.round(amount * 100),
+      currency: currency.toLowerCase(),
+      method: "standard",
+      destination: bankValidation.bankAccount.id
+    });
+
+    return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+  }
+
+  async handlePaypalWithdrawal(withdrawalData) {
+    const request = new paypal.payouts.PayoutsPostRequest();
+    request.requestBody({
+      sender_batch_header: {
+        sender_batch_id: `WD_${Date.now()}`,
+        email_subject: "You have a new withdrawal",
+      },
+      items: [
+        {
+          recipient_type: "EMAIL",
+          amount: {
+            value: withdrawalData.amount.toString(),
+            currency: withdrawalData.currency,
+          },
+          receiver: withdrawalData.paypalEmail,
+          note: "Wallet Withdrawal",
+          sender_item_id: `WD_${Date.now()}`,
+        },
+      ],
+    });
+
+    const response = await this.paypalClient.execute(request);
+    return response.result;
+  }
+
+  async handleWiseWithdrawal(withdrawalData) {
+    const transferPayload = {
+      targetAccount: withdrawalData.wiseRecipientId,
+      sourceCurrency: withdrawalData.currency,
+      targetCurrency: withdrawalData.currency,
+      amount: withdrawalData.amount,
+      reference: "Wallet Withdrawal",
+    };
+    const response = await this.wiseAPI.post("/transfers", transferPayload);
+    return response.data;
+  }
+}
+
+  // constructor() {
+  //   this.flutterwaveAPI = axios.create({
+  //     baseURL: "https://api.flutterwave.com/v3",
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //       "Authorization": `Bearer ${process.env.FLW_SECRET_KEY}`
+  //     }
+  //   });
+
+  //   // Initialize Stripe SDK
+  //   this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  //     apiVersion: '2025-01-27.acacia',
+  //   });
+
+  //   // Initialize PayPal SDK (using the Sandbox environment for testing)
+  //   const environment = new paypal.core.SandboxEnvironment(
+  //     process.env.PAYPAL_CLIENT_ID,
+  //     process.env.PAYPAL_CLIENT_SECRET
+  //   );
+  //   this.paypalClient = new paypal.core.PayPalHttpClient(environment);
+
+  //   this.wiseAPI = axios.create({
+  //     // baseURL: "https://api.wise.com/v1",
+  //     baseURL: "https://api.sandbox.transferwise.tech/v1", // Use Wise Sandbox API
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //       "Authorization": `Bearer ${process.env.WISE_API_KEY}`
+  //     }
+  //   });
+  // }
+
+// class WithdrawalService {
+//   constructor() {
+//     this.flutterwaveAPI = axios.create({
+//       baseURL: "https://api.flutterwave.com/v3",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "Authorization": `Bearer ${process.env.FLW_SECRET_KEY}`
+//       }
+//     });
+
+//     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+//       apiVersion: '2025-01-27.acacia',
+//     });
+
+//     const environment = new paypal.core.SandboxEnvironment(
+//       process.env.PAYPAL_CLIENT_ID,
+//       process.env.PAYPAL_CLIENT_SECRET
+//     );
+//     this.paypalClient = new paypal.core.PayPalHttpClient(environment);
+
+//     this.wiseAPI = axios.create({
+//       baseURL: "https://api.sandbox.transferwise.tech/v1",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "Authorization": `Bearer ${process.env.WISE_API_KEY}`
+//       }
+//     });
+//   }
+
+
+//     /**
+//    * Verify bank account details for Stripe withdrawals (U.S. only)
+//    */
+//     async resolveBankAccountForStripe(accountNumber, routingNumber) {
+//       try {
+//         // Create a Stripe bank account token to validate details
+//         const bankAccount = await stripe.tokens.create({
+//           bank_account: {
+//             country: "US",
+//             currency: "usd",
+//             account_holder_type: "individual",
+//             routing_number: routingNumber,
+//             account_number: accountNumber
+//           }
+//         });
+  
+//         return { success: true, bankAccount };
+//       } catch (error) {
+//         console.error("Stripe Bank Account Validation Error:", error);
+//         return { success: false, message: error.message };
+//       }
+//     }
+
+
+
+//   /**
+//    * Process withdrawal for different payment gateways
+//    */
+//   async processWithdrawal(withdrawalData) {
+//     switch (withdrawalData.gateway) {
+//       // Handle Flutterwave Payouts (Nigerian Bank Account)
+//       case 'flutterwave': {
+//         const payload = {
+//           account_bank: withdrawalData.bankCode,
+//           account_number: withdrawalData.accountNumber,
+//           amount: withdrawalData.amount,
+//           narration: "Wallet Withdrawal",
+//           currency: withdrawalData.currency,
+//           reference: `WD_${Date.now()}`,
+//           debit_currency: withdrawalData.currency,
+//         };
+//         const response = await this.flutterwaveAPI.post("/transfers", payload);
+//         return response.data;
+//       }
+
+// // Handle Stripe Connect Payouts
+// case "stripe-connect": {
+//   const { stripeAccountId, amount, currency } = withdrawalData;
+
+//   const payout = await stripe.transfers.create({
+//     amount: Math.round(amount * 100), // Convert to cents
+//     currency: currency.toLowerCase(),
+//     destination: stripeAccountId, // Connected account ID
+//     transfer_group: `withdrawal_${Date.now()}`
+//   });
+
+//   return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+// }
+
+// // Handle Stripe Direct Bank Payouts (U.S. only)
+// case "stripe-bank": {
+//   const { accountNumber, routingNumber, accountHolderName, amount, currency } = withdrawalData;
+
+//   // Validate the bank details before processing the withdrawal
+//   const bankValidation = await this.resolveBankAccountForStripe(accountNumber, routingNumber);
+//   if (!bankValidation.success) {
+//     throw new Error(bankValidation.message);
+//   }
+
+//   const payout = await stripe.payouts.create({
+//     amount: Math.round(amount * 100),
+//     currency: currency.toLowerCase(),
+//     method: "standard",
+//     destination: bankValidation.bankAccount.id
+//   });
+
+//   return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+// }
+
+// // Handle Paypal Payouts via paypal email
+//       case 'paypal': {
+//         const request = new paypal.payouts.PayoutsPostRequest();
+//         request.requestBody({
+//           sender_batch_header: {
+//             sender_batch_id: `WD_${Date.now()}`,
+//             email_subject: "You have a new withdrawal",
+//           },
+//           items: [
+//             {
+//               recipient_type: "EMAIL",
+//               amount: {
+//                 value: withdrawalData.amount.toString(),
+//                 currency: withdrawalData.currency,
+//               },
+//               receiver: withdrawalData.paypalEmail,
+//               note: "Wallet Withdrawal",
+//               sender_item_id: `WD_${Date.now()}`,
+//             },
+//           ],
+//         });
+//         const response = await this.paypalClient.execute(request);
+//         return response.result;
+//       }
+
+//       // Handle Wise Payouts
+//       case 'wise': {
+//         // Step 1: Create a transfer
+//         const transferPayload = {
+//           targetAccount: withdrawalData.wiseRecipientId,
+//           sourceCurrency: withdrawalData.currency,
+//           targetCurrency: withdrawalData.currency,
+//           amount: withdrawalData.amount,
+//           reference: "Wallet Withdrawal",
+//         };
+//         const response = await this.wiseAPI.post("/transfers", transferPayload);
+//         return response.data;
+//       }
+//       default:
+//         throw new Error("Invalid withdrawal gateway selected");
+//     }
+//   }
+// }
+
+
 class TransactionService {
 
   // Get all Transactions, sorted by creation date (newest first).
@@ -246,4 +564,50 @@ const paymentGatewayCurrencies = {
 };
 
 
-module.exports = { PaymentService, TransactionService, WalletService, paymentGatewayCurrencies };
+const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
+
+// Helper function to validate the bank account using Flutterwave
+const verifyBankAccount = async (bankCode, accountNumber) => {
+  try {
+    const reqBody = {
+      account_number: accountNumber,
+      account_bank: bankCode,
+    };
+
+    // Send POST request to Flutterwave API to validate the bank account
+    const response = await axios.post(
+      "https://api.flutterwave.com/v3/accounts/resolve",
+      reqBody,
+      {
+        headers: {
+          Authorization: `Bearer ${FLW_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    // Return the response data from Flutterwave
+    return response.data;
+  } catch (error) {
+    // Handle specific errors from Flutterwave API
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        const errorMessage =
+          error.response.data.message ||
+          "An error occurred while validating the bank account.";
+        console.error("Flutterwave API Error:", error.response.data);
+        throw new Error(errorMessage);
+      }
+
+      throw new Error(
+        "Internal Server Error: Could not communicate with Flutterwave API."
+      );
+    }
+    throw new Error(
+      "An unexpected error occurred during bank account validation."
+    );
+  }
+};
+
+
+module.exports = { PaymentService, WithdrawalService, TransactionService, WalletService, paymentGatewayCurrencies, verifyBankAccount };

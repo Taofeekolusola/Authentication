@@ -20,7 +20,7 @@ const TransactionSchema = new mongoose.Schema(
     },
     method: {
       type: String,
-      enum: ["flutterwave", "paypal", "stripe", "wise"],
+      enum: ["flutterwave", "paypal", "stripe", "wise", "stripe-connect", "stripe-bank"],
       required: true,
     },
     paymentType: {
