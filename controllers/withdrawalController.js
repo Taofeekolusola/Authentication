@@ -252,7 +252,7 @@ const handleWithdrawal = async (req, res) => {
     const transaction = new Transaction({
       userId,
       email: user.email,
-      newAmount,
+      amount: (gateway === "stripe-connect" || gateway === "stripe-bank") ? newAmount : amount,
       currency,
       method: gateway,
       paymentType: "withdrawal",
