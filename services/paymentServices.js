@@ -198,14 +198,15 @@ class WithdrawalService extends BasePaymentService {
   }
 
   async handleFlutterwaveWithdrawal(withdrawalData) {
+    const { bankCode, accountNumber, amount, currency } = withdrawalData;
     const payload = {
-      account_bank: withdrawalData.bankCode,
-      account_number: withdrawalData.accountNumber,
-      amount: withdrawalData.amount,
+      account_bank: bankCode,
+      account_number: accountNumber,
+      amount: amount,
       narration: "Wallet Withdrawal",
-      currency: withdrawalData.currency,
-      reference: `WD_${Date.now()}`,
-      debit_currency: withdrawalData.currency,
+      currency: currency,
+      reference: `WDL_${Date.now()}`,
+      debit_currency: currency,
     };
     const response = await this.flutterwaveAPI.post("/transfers", payload);
     return response.data;

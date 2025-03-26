@@ -212,7 +212,7 @@ const handleWithdrawal = async (req, res) => {
     if (gateway === "flutterwave") {
       const { bankCode, accountNumber } = recipientDetails;
       const verifiedAccount = await verifyBankAccount(bankCode, accountNumber);
-      if (!verifiedAccount.status) {
+      if (verifiedAccount.status !== "success") {
         return res.status(400).json({ success: false, message: "Invalid bank account details" });
       }
     }
