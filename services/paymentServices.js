@@ -209,7 +209,9 @@ class WithdrawalService extends BasePaymentService {
       debit_currency: currency,
     };
     const response = await this.flutterwaveAPI.post("/transfers", payload);
-    return response.data;
+    // return response.data;
+    return {
+      success: response.data.status === "success", reference: response.data.data.reference, id: response.data.data.id, status: response.data.data.status, data: response.data.data };
   }
 
   async handleStripeConnectWithdrawal(withdrawalData) {
