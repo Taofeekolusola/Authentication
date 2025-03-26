@@ -156,7 +156,7 @@ const {  WithdrawalService, TransactionService, WalletService, verifyBankAccount
 const Transaction = require("../models/transactionModel");
 const User = require("../models/Users");
 const { convertUsdToNgn } = require("../helpers/helpers");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY); // Load Stripe API
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY); // Load Stripe API..
 
 // Define allowed gateways and required recipient details
 const PAYMENT_GATEWAYS = {
