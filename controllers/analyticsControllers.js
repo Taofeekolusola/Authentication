@@ -132,9 +132,95 @@ const getCompletedTasksOverTime = async (req, res) => {
   }
 };
 
+const getPopularTasksAnalysis = async (req, res) => {
+  try {
+    const taskCreatorId = req.user._id;
 
+    const result = await Task.aggregate([
+      // Filter tasks by the logged-in user
+      { $match: { userId: taskCreatorId, visibility: "Published" } },
+
+      // Join with TaskApplication collection
+      {
+        $lookup: {
+          from: "taskapplications",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "applications",
+        },
+      },
+
+      // Unwind applications array to process each application separately
+      { $unwind: { path: "$applications", preserveNullAndEmptyArrays: true } },
+
+      // Group by Task Type
+      {
+        $group: {
+          _id: "$taskType", // Group by task type
+          taskType: { $first: "$taskType" }, // Store task type
+          posted: { $sum: 1 }, // Count the number of tasks of this type
+          completed: {
+            $sum: {
+              $cond: [{ $eq: ["$applications.earnerStatus", "Completed"] }, 1, 0],
+            },
+          },
+          accepted: {
+            $sum: {
+              $cond: [{ $eq: ["$applications.reviewStatus", "Approved"] }, 1, 0],
+            },
+          },
+          engagement: { $sum: { $cond: [{ $ifNull: ["$applications", false] }, 1, 0] } },
+
+          totalRespondents: { $sum: "$noOfRespondents" },
+
+          // Calculate average duration
+          averageDuration: {
+            $avg: {
+              $cond: {
+                if: { $gt: ["$applications.submittedAt", null] }, // Ensure submittedAt is not null
+                then: { $subtract: ["$applications.submittedAt", "$applications.createdAt"] },
+                else: null,
+              },
+            },
+          },
+        },
+      },
+
+      // Sort by most posted tasks
+      { $sort: { posted: -1 } },
+    ]);
+
+    // Format averageDuration into days, hours, and minutes
+    const formattedResult = result.map(({ totalRespondents, engagement, ...task }) => ({
+      ...task,
+      averageDuration: formatDuration(task.averageDuration),
+      engagementPercentage: totalRespondents 
+        ? Math.round((engagement / totalRespondents) * 100)
+        : 0,
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Popular tasks analysis fetched successfully",
+      data: formattedResult,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+const formatDuration = (milliseconds) => {
+  if (!milliseconds) return "0d 0h 0m";
+  const totalMinutes = Math.floor(milliseconds / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return `${days}d ${hours}h ${minutes}m`;
+};
 
 module.exports = {
   getAnalyticsOverview,
-  getCompletedTasksOverTime
+  getCompletedTasksOverTime,
+  getPopularTasksAnalysis
 }
