@@ -171,6 +171,8 @@ const getPopularTasksAnalysis = async (req, res) => {
           },
           engagement: { $sum: { $cond: [{ $ifNull: ["$applications", false] }, 1, 0] } },
 
+          totalRespondents: { $sum: "$noOfRespondents" },
+
           // Calculate average duration
           averageDuration: {
             $avg: {
@@ -189,9 +191,12 @@ const getPopularTasksAnalysis = async (req, res) => {
     ]);
 
     // Format averageDuration into days, hours, and minutes
-    const formattedResult = result.map((task) => ({
+    const formattedResult = result.map(({ totalRespondents, engagement, ...task }) => ({
       ...task,
       averageDuration: formatDuration(task.averageDuration),
+      engagementPercentage: totalRespondents 
+        ? Math.round((engagement / totalRespondents) * 100)
+        : 0,
     }));
 
     res.status(200).json({
