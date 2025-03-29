@@ -148,6 +148,7 @@ if (event.type === "checkout.session.completed") {
 // ✅ Stripe Connect Transfers (for vendor withdrawals)
 else if (event.type === "transfer.created") {
   console.log(`💰 Stripe Connect Transfer ${reference} created! Awaiting payout...`);
+  await handleTransferSuccess({ tx_ref: reference }, "Stripe Connect");
 } else if (event.type === "transfer.failed") {
   await handleTransferFailed({ tx_ref: reference }, "Stripe Connect");
 } else if (event.type === "transfer.reversed") {
@@ -165,7 +166,7 @@ else if (event.type === "payout.paid") {
 } else if (event.type === "payout.updated") {
   const payout = event.data.object;
   console.log(`🔄 Stripe Bank Payout ${payout.id} updated! New Status: ${payout.status}`);
-  await updatePayoutStatusInDatabase(payout.id, payout.status);
+  await handleTransferSuccess({ tx_ref: reference }, "Stripe Bank");
 } 
 
 // ✅ Unhandled event types
@@ -173,22 +174,6 @@ else {
   console.log(`Unhandled Stripe event type: ${event.type}`);
   return res.status(200).json({ message: "Unhandled event type" });
 }
-
-  // if (event.type === "checkout.session.completed") {
-  //   const session = event.data.object;
-  //   if (session.payment_status === "paid") {
-  //     await handleChargeSuccess({ tx_ref: reference }, "Stripe");
-  //   }
-  // } else if (event.type === "payment_intent.payment_failed") {
-  //   await handleChargeFailed({ tx_ref: reference }, "Stripe");
-  // } else if (event.type === "payout.paid") {
-  //   await handleTransferSuccess({ tx_ref: reference }, "Stripe");
-  // } else if (event.type === "payout.failed") {
-  //   await handleTransferFailed({ tx_ref: reference }, "Stripe");
-  // } else {
-  //   console.log(`Unhandled Stripe event type: ${event.type}`);
-  //   return res.status(200).json({ message: "Unhandled event type" });
-  // }
 
   return res.status(200).json({ received: true });
 };
@@ -384,7 +369,7 @@ const handleTransferSuccess = async (data, gateway) => {
 
     let amount = transferRecord.amount;
 
-    // Update the user's wallet balance and add the transaction
+    // Update the user's wallet balance and deduct the transaction
     const wallet = await Wallet.findOne({ userId: transferRecord.userId });
     if (wallet) {
           // Convert USD to NGN if the gateway is Stripe

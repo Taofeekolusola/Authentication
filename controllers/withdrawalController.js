@@ -275,7 +275,7 @@ const handleWithdrawal = async (req, res) => {
     const transaction = new Transaction({
       userId,
       email: user.email,
-      amount: (gateway === "stripe-connect" || gateway === "stripe-bank") ? newAmount : amount,
+      amount: amount,
       currency,
       method: gateway,
       paymentType: "withdrawal",
@@ -326,4 +326,20 @@ const temporaryAddWalletBalance = async (req, res) => {
 }
 
 
-module.exports = { handleWithdrawal, temporaryAddWalletBalance };
+const testExchangeRate = async (req, res) => {
+  try {
+
+    const { amount } = req.body;
+    if (!amount) return res.status(400).json({ message: "Please input the amount!" })
+
+    const convertedAmount = await convertUsdToNgn(amount);
+    return res.status(200).json({ success: true, convertedAmount });
+
+  } catch (error) {
+    console.error("Exchange Rate Error:", error);
+    return res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+  }
+}
+
+
+module.exports = { handleWithdrawal, temporaryAddWalletBalance, testExchangeRate };
