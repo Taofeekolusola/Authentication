@@ -178,6 +178,7 @@ else {
   return res.status(200).json({ received: true });
 };
 
+
 /**
  * PayPal webhook handler.
  */
@@ -210,6 +211,7 @@ const handlePaypalWebhook = async (req, res) => {
   }
   return res.status(200).json({ status: "success", message: "PayPal webhook processed" });
 };
+
 
 /**
  * Wise webhook handler.
@@ -249,6 +251,8 @@ const handleWiseWebhook = async (req, res) => {
   }
   return res.status(200).json({ received: true });
 };
+
+
 
 // ---------------------------------------------------
 // Unified Event Handlers for Payment and Transfers
@@ -323,6 +327,8 @@ const handleChargeSuccess = async (data, gateway) => {
   }
 };
 
+
+
 /**
  * Handles failed charge events.
  */
@@ -356,6 +362,11 @@ const handleChargeFailed = async (data, gateway) => {
   }
 };
 
+
+
+/**
+ * Handles successfully transfer events.
+ */
 const handleTransferSuccess = async (data, gateway) => {
   console.log(`Handling transfer success from ${gateway}:`, data);
   try {
@@ -373,7 +384,7 @@ const handleTransferSuccess = async (data, gateway) => {
     const wallet = await Wallet.findOne({ userId: transferRecord.userId });
     if (wallet) {
           // Convert USD to NGN if the gateway is Stripe
-    if (gateway === "Stripe") {
+    if (gateway === "Stripe Connect" || gateway === "Stripe Bank") {
       try {
         amount = await convertUsdToNgn(amount); // Wait for the conversion to complete
         console.log(`Amount in NGN: ${amount}`);
@@ -387,7 +398,7 @@ const handleTransferSuccess = async (data, gateway) => {
       await wallet.save();
     }
 
-    const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} to ${transferRecord.recipient_name} was successful. Reference: ${transferRecord.reference}. \n\n Your Team`;
+    const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} was successful. Reference: ${transferRecord.reference}. \n\n AltBucks`;
     const recipient = transferRecord.email;
     if (recipient && typeof recipient === "string") {
       const emailHTML = generateEmailTemplate("Transfer Successful", recipient, emailBody);
@@ -405,6 +416,8 @@ const handleTransferSuccess = async (data, gateway) => {
     console.error("Error processing transfer success event:", err.message);
   }
 };
+
+
 
 /**
  * Handles failed transfer events.
