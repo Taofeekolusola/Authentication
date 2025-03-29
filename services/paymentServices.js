@@ -197,24 +197,54 @@ class WithdrawalService extends BasePaymentService {
     }
   }
 
+  // async handleFlutterwaveWithdrawal(withdrawalData) {
+  //   const { bankCode, accountNumber, amount, currency } = withdrawalData;
+  //   const payload = {
+  //     account_bank: bankCode,
+  //     account_number: accountNumber,
+  //     amount: amount,
+  //     narration: "Wallet Withdrawal",
+  //     currency: currency,
+  //     reference: `WDL_${Date.now()}`,
+  //     debit_currency: currency,
+  //   };
+  //   const response = await this.flutterwaveAPI.post("/transfers", payload);
+  //   // return response.data;
+  //   return {
+  //     success: response.data.status === "success", reference: response.data.data.reference, id: response.data.data.id, status: response.data.data.status, data: response.data.data };
+  // }
+
   async handleFlutterwaveWithdrawal(withdrawalData) {
-    const { bankCode, accountNumber, amount, currency } = withdrawalData;
-    const payload = {
-      account_bank: bankCode,
-      account_number: accountNumber,
-      amount: amount,
-      narration: "Wallet Withdrawal",
-      currency: currency,
-      reference: `WDL_${Date.now()}`,
-      debit_currency: currency,
-    };
-    const response = await this.flutterwaveAPI.post("/transfers", payload);
-    // return response.data;
-    return {
-      success: response.data.status === "success", reference: response.data.data.reference, id: response.data.data.id, status: response.data.data.status, data: response.data.data };
-  }
+    try {
+        const { bankCode, accountNumber, amount, currency } = withdrawalData;
+        const payload = {
+            account_bank: bankCode,
+            account_number: accountNumber,
+            amount: amount,
+            narration: "Wallet Withdrawal",
+            currency: currency,
+            reference: `WDL_${Date.now()}`,
+            debit_currency: currency,
+        };
+
+        const response = await this.flutterwaveAPI.post("/transfers", payload);
+        
+        return {
+            success: response.data.status === "success",
+            reference: response.data.data?.reference,
+            id: response.data.data?.id,
+            status: response.data.data?.status,
+            data: response.data.data,
+        };
+    } catch (error) {
+        console.error("Flutterwave Withdrawal Error:", error);
+        return { success: false, message: error.message, error: error };
+    }
+}
+
 
   async handleStripeConnectWithdrawal(withdrawalData) {
+    try {
     const { stripeAccountId, amount, currency } = withdrawalData;
     const payout = await this.stripe.transfers.create({
       amount: Math.round(amount * 100),
@@ -224,13 +254,16 @@ class WithdrawalService extends BasePaymentService {
     });
 
     return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+  } catch (error) {
+    console.error("Stripe Connect Payout Error:", error);
+    return { success: false, message: error.message, error: error };
   }
+}
 
   async handleStripeBankWithdrawal(withdrawalData) {
     const { accountNumber, routingNumber, amount, currency } = withdrawalData;
 
-    let payoutRecipient;
-
+    try {
         // ✅ Validate & Tokenize Bank Account
         const bankValidation = await this.resolveBankAccountForStripe(accountNumber, routingNumber);
         if (!bankValidation.success) throw new Error(bankValidation.message);
@@ -241,21 +274,27 @@ class WithdrawalService extends BasePaymentService {
             { external_account: bankValidation.bankTokenId }
         );
 
-        payoutRecipient = bankAccount.id;
+        const payoutRecipient = bankAccount.id;
 
-    // ✅ Initiate the payout
-    const payout = await this.stripe.payouts.create({
-        amount: Math.round(amount * 100),
-        currency: currency.toLowerCase(),
-        method: "standard",
-        destination: payoutRecipient
-    });
+        // ✅ Initiate the Instant Payout
+        const payout = await this.stripe.payouts.create({
+            amount: Math.round(amount * 100),
+            currency: currency.toLowerCase(),
+            method: "instant",
+            destination: payoutRecipient
+        });
 
-    return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+        return { success: true, id: payout.id, status: payout.status, reference: payout.id };
+
+    } catch (error) {
+        console.error("Stripe Bank Payout Error:", error);
+        return { success: false, message: error.message };
+    }
 }
 
 
   async handlePaypalWithdrawal(withdrawalData) {
+    try {
     const request = new paypal.payouts.PayoutsPostRequest();
     request.requestBody({
       sender_batch_header: {
@@ -278,7 +317,11 @@ class WithdrawalService extends BasePaymentService {
 
     const response = await this.paypalClient.execute(request);
     return response.result;
+  } catch (error) {
+    console.error("PayPal Withdrawal Error:", error);
+    return { success: false, message: error.message, error: error };
   }
+}
 
   async handleWiseWithdrawal(withdrawalData) {
     try {
