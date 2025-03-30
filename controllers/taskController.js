@@ -428,65 +428,6 @@ const getTaskCreatorDashboard = async (req, res) => {
 };
 
 
-/*const generateTaskReportPDF = async (req, res, next) => {
-  //try {
-      const stream = res.writeHead(200, {
-        'Content-Type' : 'application/pdf',
-        'Content-Disposition' :  'inline; filename=task.pdf'
-      });
-
-      taskService.buildPDF(
-        (chunk) => stream.write(chunk),
-        () => stream.end()
-      );
-
-      /*console.log("Fetching task report data...");
-      const data = await taskService.getTaskReportData(); // Fetch data
-      
-
-      const doc = new PDFDocument();
-      //const writeStream = fs.createWriteStream(filePath);
-
-      doc.pipe(res);
-
-      doc.fontSize(18).text("Spending Over Time Report", { align: "center" });
-      doc.moveDown();
-      doc.fontSize(14).text(`Total Amount Spent: $${data.totalAmountSpent || 0}`);
-      doc.text(`Work In Progress Tasks: ${data.workInProgressTasks || 0}`);
-      doc.text(`Completed Tasks: ${data.completedTasks || 0}`);
-      doc.moveDown();
-
-
-      doc.text("Task Earning Report:");
-      doc.text(`All Time: $${data.spendingOverTime?.taskEarningReport?.allTime || 0}`);
-      doc.text(`Last 30 Days: $${data.spendingOverTime?.taskEarningReport?.last30Days || 0}`);
-      doc.text(`Last 7 Days: $${data.spendingOverTime?.taskEarningReport?.last7Days || 0}`);
-      doc.text(`Today: $${data.spendingOverTime?.taskEarningReport?.today || 0}`);
-      doc.moveDown();
-
-
-      doc.text("Spending Over Time Graph Data:");
-      if (Array.isArray(data.spendingOverTime?.graphData)) {
-          data.spendingOverTime.graphData.forEach((entry) => {
-              const formattedDate = entry.date
-                  ? new Date(entry.date).toISOString().split("T")[0]
-                  : "N/A";
-              doc.text(`Date: ${formattedDate}, Amount: $${entry.amount || 0}`);
-          });
-      } else {
-          doc.text("No graph data available.");
-      }
-
-      doc.end();
-
-
-  } catch (error) {
-      console.error("Error generating PDF:", error);
-      res.status(500).json({ message: "Internal server error", error: error.message });
-  }
-};
-*/
-
 const generateTaskReportPDF = async (req, res) => {   
   try {  
     const { userId } = req.query;     
@@ -556,7 +497,7 @@ const generateTaskReportPDF = async (req, res) => {
       res.end();
     }
   );
-  
+
   } catch (error) {  
     console.error("Error generating PDF:", error);
     res.status(500).json({ success: false, message: "Error generating PDF" });  
