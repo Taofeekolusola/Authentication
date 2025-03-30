@@ -1,9 +1,11 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
+//const taskService = require("../services/taskServices")
 const paginate = require("../utils/paginate");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+
 
 const {
   createTaskValidationSchema,
@@ -458,25 +460,53 @@ const getTaskCreatorDashboard = async (req, res) => {
   try {
     const { userId, exportPdf } = req.query;
 
+
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
 
+
     // Fetch tasks created by the user
     const tasks = await Task.find({ userId });
 
+
     // Calculate Amount Spent
     const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
+
 
     // Work In Progress & Completed Tasks Count
     const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
     const completedTasks = tasks.filter(task => task.status === "completed").length;
 
-    // Spending Over Time
+
+    // Task Total
+    const taskTotal = {
+      labels: ["Cancelled", "Pending", "Completed"],
+      datasets: [
+        tasks.filter(task => task.status === "cancelled").length,
+        tasks.filter(task => task.status === "pending").length,
+        completedTasks,
+      ],
+    };
+
+
+    // Spending Over Time (Graph Data & Task Earning Report)
     const spendingOverTime = {
       graphData: tasks.map(task => ({
         date: task.createdAt,
         amount: task.compensation.amount || 0,
+        category: task.category || "Uncategorized",
+        status: task.status,
+        taskTitle: task.title,
+        taskId: task._id,
+        creatorId: task.userId,
+        assignedUser: task.assignedTo || "Unassigned",
+        completionTime: task.completedAt || null,
+        duration: task.completedAt
+          ? (new Date(task.completedAt) - new Date(task.createdAt)) / (1000 * 60 * 60) // Duration in hours
+          : null,
+        paymentStatus: task.paymentStatus || "Pending",
+        earningsByDay: task.earningsByDay || [],
       })),
       taskEarningReport: {
         allTime: totalAmountSpent,
@@ -492,13 +522,14 @@ const getTaskCreatorDashboard = async (req, res) => {
       },
     };
 
+
     // If exportPdf is requested, generate and send PDF as a stream
     if (exportPdf === "true") {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=spending_report_${userId}.pdf`);
-
       const doc = new PDFDocument();
       doc.pipe(res); // Stream directly to response
+
 
       // PDF Content
       doc.fontSize(18).text("Spending Over Time Report", { align: "center" }).moveDown();
@@ -515,9 +546,11 @@ const getTaskCreatorDashboard = async (req, res) => {
         doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}`);
       });
 
+
       doc.end();
       return;
     }
+
 
     // Return JSON response if exportPdf is not requested
     res.status(200).json({
@@ -527,6 +560,7 @@ const getTaskCreatorDashboard = async (req, res) => {
         workInProgressTasks,
         completedTasks,
         spendingOverTime,
+        taskTotal,
       },
     });
   } catch (error) {
@@ -536,21 +570,90 @@ const getTaskCreatorDashboard = async (req, res) => {
 };
 
 
+const generateTaskReportPDF = async (req, res) => {
+  try {
+    const { userId } = req.query;
 
 
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
 
-module.exports = {
-    createTaskHandler,
-    updateTaskHandler,
-    deleteTaskHandler,
-    getAllTasksHandler,
-    getCompletedTasksHandler,
-    getTaskCreatorAmountSpentHandler,
-    getTaskCreatorTasksHandler,
-    getAvailableTasksHandler,
-    getInProgressTasksHandler,
-    searchAllTasksHandler,
-    postTaskHandler,
-    getTaskCreatorDashboard,
-  
+
+    // Fetch tasks from DB
+    const tasks = await Task.find({ userId });
+
+
+    // Calculate statistics
+    const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
+    const completedTasks = tasks.filter(task => task.status === "completed").length;
+    const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
+
+
+    // Prepare spending report data
+    const spendingOverTime = tasks.map(task => ({
+      date: task.createdAt.toISOString().split("T")[0],
+      amount: task.compensation.amount || 0,
+      status: task.status,
+      title: task.title,
+    }));
+
+
+    // Function to generate PDF
+    function buildPDF(dataCallback, endCallback) {
+      const doc = new PDFDocument();
+      doc.on("data", dataCallback);
+      doc.on("end", endCallback);
+
+
+      doc.fontSize(18).text("Task Spending Report", { align: "center" }).moveDown();
+      doc.fontSize(14).text(`Total Amount Spent: $${totalAmountSpent}`);
+      doc.text(`Work In Progress Tasks: ${workInProgressTasks}`);
+      doc.text(`Completed Tasks: ${completedTasks}`).moveDown();
+      doc.text("Spending Over Time:");
+
+
+      spendingOverTime.forEach(entry => {
+        doc.text(`Date: ${entry.date}, Amount: $${entry.amount}, Status: ${entry.status}`);
+      });
+
+
+      doc.end();
+    }
+
+
+    // Set headers correctly
+    res.status(200).set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename=spending_report_${userId}.pdf`,
+    });
+
+
+    buildPDF(
+      chunk => res.write(chunk),
+      () => res.end()
+    );
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    res.status(500).json({ success: false, message: "Error generating PDF" });
+  }
 };
+
+
+// Export Handlers
+module.exports = {
+  createTaskHandler,
+  updateTaskHandler,
+  deleteTaskHandler,
+  getAllTasksHandler,
+  getCompletedTasksHandler,
+  getTaskCreatorAmountSpentHandler,
+  getTaskCreatorTasksHandler,
+  getAvailableTasksHandler,
+  getInProgressTasksHandler,
+  searchAllTasksHandler,
+  postTaskHandler,
+  getTaskCreatorDashboard,
+  generateTaskReportPDF,
+};
+
