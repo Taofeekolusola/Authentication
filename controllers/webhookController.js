@@ -136,20 +136,48 @@ const handleStripeWebhook = async (req, res) => {
   }
 
   // Handle specific event types
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    if (session.payment_status === "paid") {
+if (event.type === "checkout.session.completed") {
+  const session = event.data.object;
+  if (session.payment_status === "paid") {
       await handleChargeSuccess({ tx_ref: reference }, "Stripe");
-    }
-  } else if (event.type === "payment_intent.payment_failed") {
-    await handleChargeFailed({ tx_ref: reference }, "Stripe");
-  } else {
-    console.log(`Unhandled Stripe event type: ${event.type}`);
-    return res.status(200).json({ message: "Unhandled event type" });
   }
+} else if (event.type === "payment_intent.payment_failed") {
+  await handleChargeFailed({ tx_ref: reference }, "Stripe");
+} 
+
+// ✅ Stripe Connect Transfers (for vendor withdrawals)
+else if (event.type === "transfer.created") {
+  console.log(`💰 Stripe Connect Transfer ${reference} created! Awaiting payout...`);
+  await handleTransferSuccess({ tx_ref: reference }, "Stripe Connect");
+} else if (event.type === "transfer.failed") {
+  await handleTransferFailed({ tx_ref: reference }, "Stripe Connect");
+} else if (event.type === "transfer.reversed") {
+  console.log(`⚠️ Stripe Connect Transfer ${reference} was reversed!`);
+  await handleTransferFailed({ tx_ref: reference }, "Stripe Connect");
+} 
+
+// ✅ Stripe Bank Payouts
+else if (event.type === "payout.paid") {
+  console.log(`✅ Stripe Bank Payout ${reference} successful!`);
+  await handleTransferSuccess({ tx_ref: reference }, "Stripe Bank");
+} else if (event.type === "payout.failed") {
+  console.log(`❌ Stripe Bank Payout ${reference} failed!`);
+  await handleTransferFailed({ tx_ref: reference }, "Stripe Bank");
+} else if (event.type === "payout.updated") {
+  const payout = event.data.object;
+  console.log(`🔄 Stripe Bank Payout ${payout.id} updated! New Status: ${payout.status}`);
+  await handleTransferSuccess({ tx_ref: reference }, "Stripe Bank");
+} 
+
+// ✅ Unhandled event types
+else {
+  console.log(`Unhandled Stripe event type: ${event.type}`);
+  return res.status(200).json({ message: "Unhandled event type" });
+}
 
   return res.status(200).json({ received: true });
 };
+
 
 /**
  * PayPal webhook handler.
@@ -173,12 +201,17 @@ const handlePaypalWebhook = async (req, res) => {
     await handleChargeSuccess({ tx_ref: reference }, "PayPal");
   } else if (eventType === "PAYMENT.CAPTURE.DENIED" || eventType === "PAYMENT.CAPTURE.FAILED") {
     await handleChargeFailed({ tx_ref: reference }, "PayPal");
+  } else if (eventType === "PAYMENT.PAYOUTSBATCH.SUCCESS") {
+    await handleTransferSuccess({ tx_ref: reference }, "PayPal");
+  } else if (eventType === "PAYMENT.PAYOUTSBATCH.DENIED") {
+    await handleTransferFailed({ tx_ref: reference }, "PayPal");
   } else {
     console.log(`Unhandled PayPal event type: ${eventType}`);
     return res.status(200).json({ status: "success", message: "Event unhandled" });
   }
   return res.status(200).json({ status: "success", message: "PayPal webhook processed" });
 };
+
 
 /**
  * Wise webhook handler.
@@ -208,12 +241,18 @@ const handleWiseWebhook = async (req, res) => {
     await handleChargeSuccess({ tx_ref: reference }, "Wise");
   } else if (event.status === "failed") {
     await handleChargeFailed({ tx_ref: reference }, "Wise");
+  } else if (event.status === "funds_paid_out") {
+    await handleTransferSuccess({ tx_ref: reference }, "Wise");
+  } else if (event.status === "failed") {
+    await handleTransferFailed({ tx_ref: reference }, "Wise");
   } else {
     console.log(`Unhandled Wise event status: ${event.status}`);
     return res.status(200).json({ status: "success", message: "Event unhandled" });
   }
   return res.status(200).json({ received: true });
 };
+
+
 
 // ---------------------------------------------------
 // Unified Event Handlers for Payment and Transfers
@@ -288,6 +327,8 @@ const handleChargeSuccess = async (data, gateway) => {
   }
 };
 
+
+
 /**
  * Handles failed charge events.
  */
@@ -321,10 +362,15 @@ const handleChargeFailed = async (data, gateway) => {
   }
 };
 
+
+
+/**
+ * Handles successfully transfer events.
+ */
 const handleTransferSuccess = async (data, gateway) => {
   console.log(`Handling transfer success from ${gateway}:`, data);
   try {
-    const transferRecord = await transferModel.findOne({ reference: data.tx_ref });
+    const transferRecord = await Transaction.findOne({ reference: data.tx_ref });
     if (!transferRecord) {
       console.error(`Transfer record not found for reference: ${data.tx_ref}`);
       return;
@@ -332,15 +378,27 @@ const handleTransferSuccess = async (data, gateway) => {
     transferRecord.status = "successful";
     await transferRecord.save();
 
-    // Update the user's wallet balance and add the transaction
+    let amount = transferRecord.amount;
+
+    // Update the user's wallet balance and deduct the transaction
     const wallet = await Wallet.findOne({ userId: transferRecord.userId });
     if (wallet) {
-      wallet.balance -= transferRecord.amount; // Deduct the amount for transfers
+          // Convert USD to NGN if the gateway is Stripe
+    if (gateway === "Stripe Connect" || gateway === "Stripe Bank") {
+      try {
+        amount = await convertUsdToNgn(amount); // Wait for the conversion to complete
+        console.log(`Amount in NGN: ${amount}`);
+      } catch (error) {
+        console.error("Error converting USD to NGN:", error);
+      }
+    }
+
+      wallet.balance -= amount; // Deduct the amount for transfers
       wallet.transactions.push(transferRecord._id);
       await wallet.save();
     }
 
-    const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} to ${transferRecord.recipient_name} was successful. Reference: ${transferRecord.reference}. \n\n Your Team`;
+    const emailBody = `Transfer of ${transferRecord.amount} ${transferRecord.currency} was successful. Reference: ${transferRecord.reference}. \n\n AltBucks`;
     const recipient = transferRecord.email;
     if (recipient && typeof recipient === "string") {
       const emailHTML = generateEmailTemplate("Transfer Successful", recipient, emailBody);
@@ -359,13 +417,15 @@ const handleTransferSuccess = async (data, gateway) => {
   }
 };
 
+
+
 /**
  * Handles failed transfer events.
  */
 const handleTransferFailed = async (data, gateway) => {
   console.log(`Handling transfer failed from ${gateway}:`, data);
   try {
-    const transferRecord = await transferModel.findOne({ reference: data.tx_ref });
+    const transferRecord = await Transaction.findOne({ reference: data.tx_ref });
     if (!transferRecord) {
       console.error(`Transfer record not found for reference: ${data.tx_ref}`);
       return;

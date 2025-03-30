@@ -201,6 +201,73 @@ const fetchAllApplicationsEarner = async (req, res) => {
   } 
 }
 
+const fetchFeaturedApplicationsEarner = async (req, res) => {
+  try {
+    const earnerId = req.user._id;
+  
+    let applicationQuery = {
+      earnerId,
+      earnerStatus: { $in: ["In Progress", "Pending", "Cancelled"] },
+    };
+  
+    const taskApplications = await TaskApplication.find(applicationQuery)
+      .populate("taskId")
+      .limit(4)
+      .sort({ createdAt: -1 });
+  
+    res.status(200).json({
+      success: true,
+      message: "Task applications fetched successfully",
+      data: taskApplications,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  } 
+}
+
+const fetchFeaturedApplicationsCreator = async (req, res) => {
+  try {
+    const taskCreatorId = req.user._id;
+  
+    let taskApplicationsQuery = {
+      earnerStatus: { $in: ["In Progress", "Pending", "Cancelled"] },
+    };
+  
+    const taskQuery = {
+      userId: taskCreatorId,
+      visibility: "Published"
+    };
+    const matchingTasks = await Task.find(taskQuery).select("_id");
+    const matchingTaskIds = matchingTasks.map((task) => task._id);
+
+    if (matchingTaskIds.length) {
+      taskApplicationsQuery.taskId = { $in: matchingTaskIds };
+    } else {
+      return res.status(200).json({
+        success: true,
+        message: "Task applications fetched successfully",
+        data: [],
+        pagination: paginate(0, page, limit),
+      });
+    }
+  
+    const taskApplications = await TaskApplication.find(taskApplicationsQuery)
+      .populate("taskId")
+      .limit(4)
+      .sort({ createdAt: -1 });
+  
+    res.status(200).json({
+      success: true,
+      message: "Task applications fetched successfully",
+      data: taskApplications,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  } 
+}
+
 const fetchAllApplicationsCreatorSchema = Joi.object({
   search: Joi.string().allow("").optional(),
   status: Joi.string().valid("Cancelled", "In Progress", "Pending", "Completed").optional(),
@@ -210,7 +277,7 @@ const fetchAllApplicationsCreatorSchema = Joi.object({
 
 const fetchAllApplicationsCreator = async (req, res) => {
   try{
-    const { error } = fetchAllApplicationsEarnerSchema.validate(req.body);
+    const { error } = fetchAllApplicationsCreatorSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
@@ -267,4 +334,6 @@ module.exports = {
   updateReviewStatus,
   fetchAllApplicationsCreator,
   fetchAllApplicationsEarner,
+  fetchFeaturedApplicationsCreator,
+  fetchFeaturedApplicationsEarner
 }
