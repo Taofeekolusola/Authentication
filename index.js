@@ -9,9 +9,13 @@ const paymentRoute = require("./routes/paymentRoute");
 const webhookRoute = require("./routes/webhookRoute");
 const authRoutes = require("./routes/authRoutes");
 const referralRoutes = require("./routes/referralRoutes");
+const taskController = require("./controllers/taskController")
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 
 const app = express();
 
@@ -38,6 +42,7 @@ const corsOptions = {
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
     exposedHeaders: ['set-cookie']
 };
+
 
 
 // Middleware to parse raw body for the Stripe webhook
@@ -85,6 +90,7 @@ app.get('/', async (req, res) => {
     return res.send("Welcome to The Alternative Bucks! API");
 });
 
+
 // Routes
 app.use('/users', userRoutes);
 app.use('/api/v1/tasks', taskRoutes);
@@ -98,6 +104,8 @@ app.use('/uploads', express.static('uploads'));
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
+
+app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
 // Central error handling middleware
 app.use((err, req, res, next) => {

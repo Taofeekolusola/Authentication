@@ -24,6 +24,7 @@ const {
 const isApplicationOwner = require("../middleware/isApplicationOwner");
 const isTaskOwner = require("../middleware/isTaskOwner");
 const taskOwner = require("../middleware/taskOwner");
+const taskController = require("../controllers/taskController");
 
 
 // Tasks Routes
@@ -32,7 +33,7 @@ route.patch("/:taskId", validation, isTaskCreator, taskOwner, upload.single('add
 route.delete("/:taskId", validation, isTaskCreator, taskOwner, deleteTaskHandler);
 route.get("/all", validation, isTaskEarner, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
-route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard)
+route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard);
 
 // Search for available tasks (earner)
 route.post("/search", validation, isTaskEarner, searchAllTasksHandler);
@@ -40,6 +41,7 @@ route.post("/search", validation, isTaskEarner, searchAllTasksHandler);
 // Post an already created task (creator)
 route.patch("/:taskId/post", validation, isTaskCreator, taskOwner, postTaskHandler);
 
+route.get("/generateTaskReportPDF", validation, taskController.generateTaskReportPDF);
 
 // Task Applications Routes
 
