@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { taskType } = require("../validations/taskValidation");
 
 const TaskSchema = new mongoose.Schema(
   {
@@ -14,7 +15,7 @@ const TaskSchema = new mongoose.Schema(
     },
     taskType: {
       type: String,
-      enum: ["Web Development", "Design", "Review", "Writing"],
+      enum: taskType,
       required: true,
     },
     visibility: {
