@@ -9,13 +9,12 @@ const paymentRoute = require("./routes/paymentRoute");
 const webhookRoute = require("./routes/webhookRoute");
 const authRoutes = require("./routes/authRoutes");
 const referralRoutes = require("./routes/referralRoutes");
-const taskController = require("./controllers/taskController")
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const fs = require("fs");
-const path = require("path");
-const PDFDocument = require("pdfkit");
+
+
+
 
 const app = express();
 
@@ -105,7 +104,6 @@ app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
-app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
 // Central error handling middleware
 app.use((err, req, res, next) => {

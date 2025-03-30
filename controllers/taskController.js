@@ -475,13 +475,12 @@ const generateTaskReportPDF = async (req, res) => {
         doc.text(`Date: ${entry.date}, Amount: $${entry.amount}, Status: ${entry.status}`);
       });
 
-
       doc.end();
     }
 
 
-    // Send PDF response
-    const stream = res.status(200).set( {
+    // Set headers correctly
+    res.status(200).set( {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename=spending_report_${userId}.pdf`
     });
