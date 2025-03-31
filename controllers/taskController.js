@@ -5,7 +5,10 @@ const paginate = require("../utils/paginate");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const { convertUsdToNgn, convertEurToNgn } = require("../helpers/helpers");
 
+const ReserveWallet = require("../models/walletModel");
+const Wallet = require("../models/walletModel");
 
 const {
   createTaskValidationSchema,
@@ -13,7 +16,37 @@ const {
   searchTasksSchema
 } = require("../validations/taskValidation");
 
+// const createTaskHandler = async (req, res) => {
+//   try {
+//     const taskCreatorId = req.user._id;
+//     const { error, value } = createTaskValidationSchema.validate(req.body, {
+//       abortEarly: false,
+//       allowUnknown: true,
+//     });
+//     if (error) {
+//       return res.status(400).json({ error: error.details.map((d) => d.message) });
+//     }
+
+//     let additionalInfo = req.file ? req.file.path : "";
+
+//     const task = await Task.create({
+//       userId: taskCreatorId,
+//       ...value,
+//       additionalInfo,
+//     });
+
+//     res.status(201).json({ status: true, message: "Task created successfully!", task });
+//   } catch (error) {
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// };
+
+
+// Create Task Handler
 const createTaskHandler = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction(); // Start atomic transaction
+
   try {
     const taskCreatorId = req.user._id;
     const { error, value } = createTaskValidationSchema.validate(req.body, {
@@ -24,19 +57,77 @@ const createTaskHandler = async (req, res) => {
       return res.status(400).json({ error: error.details.map((d) => d.message) });
     }
 
+    const { compensation } = value;
+
+    // Validate TaskCreator Wallet Balance
+    const creatorWallet = await Wallet.findOne({ userId: taskCreatorId }).session(session);
+    if (!creatorWallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: "Wallet not found for TaskCreator" });
+    }
+
+    let convertedAmount;
+
+    if (compensation.currency === "USD") {
+      convertedAmount = await convertUsdToNgn(compensation.amount);
+    } else if (compensation.currency === "EUR") {
+      convertedAmount = await convertEurToNgn(compensation.amount);
+    } else {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: "Invalid currency. Only USD is accepted." });
+    }
+
+    if (creatorWallet.balance < convertedAmount) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: "Insufficient balance to create task" });
+    }
+
+    // Deduct TaskCreator's balance & move funds to ReserveWallet
+    creatorWallet.balance -= convertedAmount;
+    await creatorWallet.save({ session });
+
     let additionalInfo = req.file ? req.file.path : "";
 
-    const task = await Task.create({
-      userId: taskCreatorId,
-      ...value,
-      additionalInfo,
-    });
+    // Create Task
+    const task = await Task.create(
+      [
+        {
+          userId: taskCreatorId,
+          ...value,
+          additionalInfo,
+        },
+      ],
+      { session }
+    );
 
-    res.status(201).json({ status: true, message: "Task created successfully!", task });
+    // Create ReserveWallet Entry
+    await ReserveWallet.create(
+      [
+        {
+          taskId: task[0]._id, // Use correct task ID
+          taskCreatorId,
+          amount: convertedAmount,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction(); // Commit the transaction
+    session.endSession();
+
+    return res.status(201).json({ status: true, message: "Task created successfully!", task: task[0] });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    await session.abortTransaction(); // Rollback transaction on error
+    session.endSession();
+
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
+
 
 // Update Task Handler
 const updateTaskHandler = async (req, res) => {

@@ -3,6 +3,10 @@ const { Task, TaskApplication } = require("../models/Tasks");
 const { findById } = require("../models/Users");
 const paginate = require("../utils/paginate");
 
+const ReserveWallet = require("../models/walletModel");
+const Wallet = require("../models/walletModel");
+const mongoose = require("mongoose");
+
 const createTaskApplication = async (req, res) => {
   try{
     const { taskId } = req.params;
@@ -96,49 +100,134 @@ const updateReviewStatusSchema = Joi.object({
     .valid("Approved", "Pending", "Rejected")
     .required(),
 });
+// const updateReviewStatus = async (req, res) => {
+//   try{
+//     const { taskId, appId } = req.params;
+//     const { reviewStatus } = req.body;
+
+//     const { error } = updateReviewStatusSchema.validate({ reviewStatus });
+//     if (error) {
+//       return res.status(400).json({ success: false, message: error.details[0].message });
+//     }
+
+//     let taskApplication = await TaskApplication.findOne({ _id: appId, taskId }).lean();
+
+//     // Restrict update if task earner has not set task to completed
+//     if (taskApplication.earnerStatus !== "Completed") {
+//       return res.status(400).json({
+//         success: false, message: "Task is not yet completed"
+//       });
+//     }
+
+//     const updateFields = { reviewStatus };
+//     if (reviewStatus === "Pending") {
+//       updateFields.reviewedAt = null;
+//     } else {
+//       updateFields.reviewedAt = new Date();
+//     }
+
+//     taskApplication = await TaskApplication.findByIdAndUpdate(
+//       appId,
+//       { $set: updateFields },
+//       { new: true, runValidators: true }
+//     );
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Task application review status updated successfully!",
+//       data: taskApplication,
+//     });
+//   }
+//   catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// }
+
+
 const updateReviewStatus = async (req, res) => {
-  try{
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
     const { taskId, appId } = req.params;
     const { reviewStatus } = req.body;
+    const taskCreatorId = req.user._id;
 
+    // Validate request body
     const { error } = updateReviewStatusSchema.validate({ reviewStatus });
     if (error) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
-    let taskApplication = await TaskApplication.findOne({ _id: appId, taskId }).lean();
+    // Find Task Application
+    let taskApplication = await TaskApplication.findOne({ _id: appId, taskId }).session(session);
+    if (!taskApplication) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: "Task application not found" });
+    }
 
     // Restrict update if task earner has not set task to completed
     if (taskApplication.earnerStatus !== "Completed") {
-      return res.status(400).json({
-        success: false, message: "Task is not yet completed"
-      });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "Task is not yet completed" });
     }
 
-    const updateFields = { reviewStatus };
-    if (reviewStatus === "Pending") {
-      updateFields.reviewedAt = null;
-    } else {
-      updateFields.reviewedAt = new Date();
+    // Find Reserved Funds
+    const reservedFunds = await ReserveWallet.findOne({ taskId, taskCreatorId }).session(session);
+    if (!reservedFunds) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "No reserved funds found for this task" });
     }
+
+    // Find Task Earner's Wallet
+    const taskEarnerWallet = await Wallet.findOne({ userId: taskApplication.earnerId }).session(session);
+    if (!taskEarnerWallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "TaskEarner's wallet not found" });
+    }
+
+    // Transfer Funds to Task Earner's Wallet
+    taskEarnerWallet.balance += reservedFunds.amount;
+    await taskEarnerWallet.save({ session });
+
+    // Remove Reserved Funds
+    await ReserveWallet.deleteOne({ _id: reservedFunds._id }).session(session);
+
+    // Update Task Application Review Status
+    const updateFields = {
+      reviewStatus,
+      reviewedAt: reviewStatus === "Pending" ? null : new Date(),
+    };
 
     taskApplication = await TaskApplication.findByIdAndUpdate(
       appId,
       { $set: updateFields },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true, session }
     );
 
-    res.status(200).json({
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
       success: true,
       message: "Task application review status updated successfully!",
       data: taskApplication,
     });
-  }
-  catch (error) {
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
-}
+};
+
 
 const fetchAllApplicationsEarnerSchema = Joi.object({
   search: Joi.string().allow("").optional(),

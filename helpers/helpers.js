@@ -101,3 +101,17 @@ exports.convertUsdToNgn = async (amountInUsd) => {
         throw new Error("Failed to convert currency.");
     }
 };
+
+
+// Convert EUR to NGN using ExchangeRate-API
+exports.convertEurToNgn = async (amountInEur) => {
+    try {
+        const response = await axios.get(`https://v6.exchangerate-api.com/v6/${EXCHANGE_RATE_API_KEY}/latest/EUR`);
+        const exchangeRate = response.data.conversion_rates.NGN;
+        if (!exchangeRate) throw new Error("Unable to fetch NGN exchange rate.");
+        return amountInEur * exchangeRate;
+    } catch (error) {
+        console.error("Error converting EUR to NGN:", error);
+        throw new Error("Failed to convert currency.");
+    }
+};

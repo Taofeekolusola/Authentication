@@ -33,3 +33,32 @@ const WalletSchema = new mongoose.Schema(
 
 const Wallet = mongoose.model("Wallet", WalletSchema);
 module.exports = Wallet;
+
+
+
+
+const reserveWalletSchema = new mongoose.Schema({
+  taskId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "Task", 
+    required: true 
+  },
+  taskCreatorId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User", 
+    required: true 
+  },
+  amount: { 
+    type: Number, 
+    required: true 
+  },
+  currency: { 
+    type: String, 
+    default: "NGN",
+  },
+}, { timestamps: true  });
+
+
+const ReserveWallet = mongoose.model("ReserveWallet", reserveWalletSchema);
+
+module.exports = ReserveWallet;

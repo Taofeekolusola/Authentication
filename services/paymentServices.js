@@ -77,7 +77,7 @@ class PaymentService extends BasePaymentService {
           tx_ref: txRef,
           amount: paymentData.amount,
           currency: paymentData.currency,
-          redirect_url: `${FRONTEND_URL}/dashboard/my_wallet?ref=${txRef}`,
+          redirect_url: `${FRONTEND_URL}/dashboard_taskcreator/my_wallet?ref=${txRef}`,
         //   payment_options: paymentData.paymentType,
           customer: {
             email: paymentData.userEmail,
@@ -105,7 +105,7 @@ class PaymentService extends BasePaymentService {
             },
           ],
           mode: 'payment',
-          success_url: `${FRONTEND_URL}/dashboard/my_wallet?session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `${FRONTEND_URL}/dashboard_taskcreator/my_wallet?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${FRONTEND_URL}/login`,
         });
         return { checkoutUrl: session.url, reference: session.id };
@@ -124,7 +124,7 @@ class PaymentService extends BasePaymentService {
             },
           ],
           application_context: {
-            return_url: `${FRONTEND_URL}/dashboard/my_wallet`,
+            return_url: `${FRONTEND_URL}/dashboard_taskcreator/my_wallet?ref=${paymentData.reference}`,
             cancel_url: `${FRONTEND_URL}/login`,
           },
         });
@@ -150,7 +150,7 @@ class PaymentService extends BasePaymentService {
         const paymentLinkPayload = {
           quoteId: quoteId,
           description: "Fund wallet",
-          redirect_url: `${FRONTEND_URL}/dashboard/my_wallet?ref=${quoteId}`, // Success URL
+          redirect_url: `${FRONTEND_URL}/dashboard_taskcreator/my_wallet?ref=${quoteId}`, // Success URL
           cancel_url: `${FRONTEND_URL}/login`, // Cancel/failure URL
         };
       
@@ -196,23 +196,7 @@ class WithdrawalService extends BasePaymentService {
       return { success: false, message: error.message };
     }
   }
-
-  // async handleFlutterwaveWithdrawal(withdrawalData) {
-  //   const { bankCode, accountNumber, amount, currency } = withdrawalData;
-  //   const payload = {
-  //     account_bank: bankCode,
-  //     account_number: accountNumber,
-  //     amount: amount,
-  //     narration: "Wallet Withdrawal",
-  //     currency: currency,
-  //     reference: `WDL_${Date.now()}`,
-  //     debit_currency: currency,
-  //   };
-  //   const response = await this.flutterwaveAPI.post("/transfers", payload);
-  //   // return response.data;
-  //   return {
-  //     success: response.data.status === "success", reference: response.data.data.reference, id: response.data.data.id, status: response.data.data.status, data: response.data.data };
-  // }
+  
 
   async handleFlutterwaveWithdrawal(withdrawalData) {
     try {
