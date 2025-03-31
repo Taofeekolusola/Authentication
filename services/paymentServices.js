@@ -3,7 +3,7 @@ const Stripe = require('stripe');
 const paypal = require('@paypal/checkout-server-sdk');
 const dotenv = require("dotenv");
 const Transaction = require("../models/transactionModel");
-const Wallet = require("../models/walletModel");
+const {Wallet} = require("../models/walletModel");
 dotenv.config();
 
 
@@ -196,7 +196,7 @@ class WithdrawalService extends BasePaymentService {
       return { success: false, message: error.message };
     }
   }
-  
+
 
   async handleFlutterwaveWithdrawal(withdrawalData) {
     try {
