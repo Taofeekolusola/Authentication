@@ -11,7 +11,7 @@ const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
 const ReferralModel = require("../models/referralModel");
 const { TaskApplication, Task } = require("../models/Tasks");
-const Wallet = require("../models/walletModel");
+const {Wallet} = require("../models/walletModel");
 const mongoose = require("mongoose");
 
 // Signup for Task Earner

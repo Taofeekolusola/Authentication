@@ -7,8 +7,7 @@ const path = require("path");
 const PDFDocument = require("pdfkit");
 const { convertUsdToNgn, convertEurToNgn } = require("../helpers/helpers");
 
-const ReserveWallet = require("../models/walletModel");
-const Wallet = require("../models/walletModel");
+const {Wallet, ReserveWallet} = require("../models/walletModel");
 
 const {
   createTaskValidationSchema,

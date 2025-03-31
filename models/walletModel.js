@@ -32,7 +32,7 @@ const WalletSchema = new mongoose.Schema(
     
 
 const Wallet = mongoose.model("Wallet", WalletSchema);
-module.exports = Wallet;
+
 
 
 
@@ -61,4 +61,4 @@ const reserveWalletSchema = new mongoose.Schema({
 
 const ReserveWallet = mongoose.model("ReserveWallet", reserveWalletSchema);
 
-module.exports = ReserveWallet;
+module.exports = { Wallet, ReserveWallet};

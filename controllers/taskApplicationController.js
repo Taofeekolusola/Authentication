@@ -3,8 +3,7 @@ const { Task, TaskApplication } = require("../models/Tasks");
 const { findById } = require("../models/Users");
 const paginate = require("../utils/paginate");
 
-const ReserveWallet = require("../models/walletModel");
-const Wallet = require("../models/walletModel");
+const {Wallet, ReserveWallet} = require("../models/walletModel");
 const mongoose = require("mongoose");
 
 const createTaskApplication = async (req, res) => {
