@@ -219,8 +219,188 @@ const formatDuration = (milliseconds) => {
   return `${days}d ${hours}h ${minutes}m`;
 };
 
+const getWorkerEngagement = async (req, res) => {
+  try {
+    const { timeframe } = req.query;
+    const taskCreatorId = req.user._id;
+
+    // Determine the start date based on the timeframe
+    let startDate = new Date();
+    switch (timeframe) {
+      case "1year":
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        groupByFormat = "%Y-%m"; // Group by Year-Month
+        break;
+      case "30days":
+        startDate.setDate(startDate.getDate() - 30);
+        groupByFormat = "%Y-%m-%d"; // Group by Day
+        break;
+      case "7days":
+        startDate.setDate(startDate.getDate() - 7);
+        groupByFormat = "%Y-%m-%d"; // Group by Day
+        break;
+      case "today":
+        startDate.setHours(0, 0, 0, 0);
+        groupByFormat = "%Y-%m-%d"; // Group by Day
+        break;
+      default:
+        return res.status(400).json({ success: false, message: "Invalid timeframe" });
+    }
+
+    const result = await Task.aggregate([
+      {
+        $match: {
+          userId: taskCreatorId,
+          visibility: "Published",
+          createdAt: { $gte: startDate }
+        }
+      },
+      {
+        $lookup: {
+          from: "taskapplications",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "applications"
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupByFormat, date: "$createdAt" } },
+          count: { $sum: { $size: "$applications" } } // Total workers engaged per date
+        }
+      },
+      { $sort: { _id: 1 } } // Sort by date
+    ]);
+
+    // Format response
+    const formattedResult = result.map(entry => ({
+      date: entry._id,
+      count: entry.count
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Worker engagement over time fetched successfully",
+      data: formattedResult
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+const getAverageTaskDuration = async (req, res) => {
+  try {
+      const { timeframe } = req.query;
+      const taskCreatorId = req.user._id;
+      let startDate = new Date();
+      let groupByField;
+
+      // Determine the timeframe and set the startDate
+      switch (timeframe) {
+          case '1year':
+              startDate.setFullYear(startDate.getFullYear() - 1);
+              groupByField = { $dateToString: { format: "%Y", date: "$submittedAt" } }; // Group by year
+              break;
+          case '30days':
+              startDate.setDate(startDate.getDate() - 30);
+              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
+              break;
+          case '7days':
+              startDate.setDate(startDate.getDate() - 7);
+              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
+              break;
+          case 'today':
+              startDate.setHours(0, 0, 0, 0);
+              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
+              break;
+          default:
+              return res.status(400).json({ success: false, message: 'Invalid timeframe' });
+      }
+
+      const result = await Task.aggregate([
+          {
+              $match: {
+                  userId: taskCreatorId, // Filter by task creator
+                  visibility: "Published",
+                  createdAt: { $gte: startDate }
+              }
+          },
+          {
+              $lookup: {
+                  from: "taskapplications",
+                  localField: "_id",
+                  foreignField: "taskId",
+                  as: "applications"
+              }
+          },
+          { $unwind: "$applications" }, // Flatten applications array
+          {
+              $match: {
+                  "applications.earnerStatus": "Completed"
+              }
+          },
+          {
+              $project: {
+                  createdAt: "$applications.createdAt",
+                  submittedAt: "$applications.submittedAt"
+              }
+          },
+          {
+              $addFields: {
+                  duration: {
+                      $divide: [
+                          { $subtract: ["$submittedAt", "$createdAt"] }, 
+                          1000 // Convert milliseconds to seconds
+                      ]
+                  }
+              }
+          },
+          {
+              $group: {
+                  _id: groupByField,  // Group based on the selected timeframe (day, month, or year)
+                  totalDuration: { $sum: "$duration" },
+                  count: { $sum: 1 }
+              }
+          },
+          {
+              $project: {
+                  date: "$_id",
+                  averageDuration: { $divide: ["$totalDuration", "$count"] }
+              }
+          },
+          { $sort: { date: 1 } }
+      ]);
+
+      // Convert seconds to days, hours, and minutes
+      const formattedResult = result.map(entry => {
+          const avgDays = Math.floor(entry.averageDuration / 86400);
+          const avgHours = Math.floor((entry.averageDuration % 86400) / 3600);
+          const avgMinutes = Math.floor((entry.averageDuration % 3600) / 60);
+
+          return {
+              date: entry.date,
+              averageCompletionTime: `${avgDays}d ${avgHours}h ${avgMinutes}m`
+          };
+      });
+
+      return res.status(200).json({
+          success: true,
+          message: 'Task completion time fetched successfully',
+          data: formattedResult
+      });
+
+  } catch (error) {
+      console.error(error);
+      return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getAnalyticsOverview,
   getCompletedTasksOverTime,
-  getPopularTasksAnalysis
+  getPopularTasksAnalysis,
+  getWorkerEngagement,
+  getAverageTaskDuration
 }
