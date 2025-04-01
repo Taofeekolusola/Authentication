@@ -207,7 +207,7 @@ class WithdrawalService extends BasePaymentService {
             amount: amount,
             narration: "Wallet Withdrawal",
             currency: currency,
-            reference: `WDL_${Date.now()}`,
+            reference: `WDL_${Date.now()}_PMCKDU_1`,
             debit_currency: currency,
         };
 
