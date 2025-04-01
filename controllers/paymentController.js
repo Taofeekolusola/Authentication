@@ -65,6 +65,37 @@ const getWalletBalance = async (req, res) => {
   }
 };
 
+// const getWalletDetails = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+//     if (!userId) {
+//       return res.status(401).json({ message: "User not logged in" });
+//     }
+
+//     const wallet =  await WalletService.getWalletByField({userId: userId});
+//     if (!wallet) return res.status(404).json({ message: "Wallet not found" });
+
+//     let totalMoneyRecieved = 0;
+//     let totalMoneyWithdrawn = 0;
+//     let totalMoneySpent = 0;
+
+//     if (req.user.isTaskEarner) {
+//       totalMoneyRecieved 
+//       totalMoneyWithdrawn
+//     }
+
+//     if (req.user.isTaskCreator) {
+//       totalMoneyRecieved 
+//       totalMoneySpent
+//     }
+
+//     return res.status(200).json({ details: wallet });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// };
+
 const getWalletDetails = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -72,15 +103,67 @@ const getWalletDetails = async (req, res) => {
       return res.status(401).json({ message: "User not logged in" });
     }
 
-    const wallet =  await WalletService.getWalletByField({userId: userId});
+    const wallet = await WalletService.getWalletByField({ userId: userId });
     if (!wallet) return res.status(404).json({ message: "Wallet not found" });
 
-    return res.status(200).json({ details: wallet });
+    let totalMoneyReceived = 0;
+    let totalMoneyWithdrawn = 0;
+    let totalMoneySpent = 0;
+
+    if (wallet.transactions && wallet.transactions.length > 0) {
+      if (req.user.isTaskEarner) {
+        totalMoneyReceived = wallet.transactions
+          .filter(
+            (tx) =>
+              tx.method === "in-app" &&
+              tx.paymentType === "credit" &&
+              tx.status === "successful"
+          )
+          .reduce((acc, tx) => acc + tx.amount, 0);
+
+        totalMoneyWithdrawn = wallet.transactions
+          .filter(
+            (tx) =>
+              tx.paymentType === "withdrawal" && tx.status === "successful"
+          )
+          .reduce((acc, tx) => acc + tx.amount, 0);
+      }
+
+      if (req.user.isTaskCreator) {
+        totalMoneyReceived = wallet.transactions
+          .filter(
+            (tx) =>
+              tx.paymentType === "fund" && tx.status === "successful"
+          )
+          .reduce((acc, tx) => acc + tx.amount, 0);
+
+        totalMoneySpent = wallet.transactions
+          .filter(
+            (tx) =>
+              tx.method === "in-app" &&
+              tx.paymentType === "debit" &&
+              tx.status === "successful"
+          )
+          .reduce((acc, tx) => acc + tx.amount, 0);
+      }
+    }
+
+    return res.status(200).json({
+      details: wallet,
+      totalMoneyReceived,
+      totalMoneyWithdrawn,
+      totalMoneySpent,
+    });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
+
 
 const getAllWallet = async (req, res) => {
   try {

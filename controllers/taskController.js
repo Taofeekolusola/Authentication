@@ -8,6 +8,7 @@ const PDFDocument = require("pdfkit");
 const { convertUsdToNgn, convertEurToNgn } = require("../helpers/helpers");
 
 const {Wallet, ReserveWallet} = require("../models/walletModel");
+const Transaction = require("../models/transactionModel");
 
 const {
   createTaskValidationSchema,
@@ -52,7 +53,10 @@ const createTaskHandler = async (req, res) => {
       abortEarly: false,
       allowUnknown: true,
     });
+
     if (error) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: error.details.map((d) => d.message) });
     }
 
@@ -75,7 +79,7 @@ const createTaskHandler = async (req, res) => {
     } else {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: "Invalid currency. Only USD is accepted." });
+      return res.status(400).json({ error: "Invalid currency. Only USD & EUR are accepted." });
     }
 
     if (creatorWallet.balance < convertedAmount) {
@@ -86,12 +90,31 @@ const createTaskHandler = async (req, res) => {
 
     // Deduct TaskCreator's balance & move funds to ReserveWallet
     creatorWallet.balance -= convertedAmount;
+
+    // Save Transaction
+    const [transaction] = await Transaction.create(
+      [
+        {
+          userId: taskCreatorId,
+          email: creatorWallet.email,
+          amount: convertedAmount,
+          currency: "NGN",
+          method: "in-app",
+          paymentType: "debit",
+          status: "successful",
+          reference: `REF_${Date.now()}-altB`,
+        },
+      ],
+      { session }
+    );
+
+    creatorWallet.transactions.push(transaction._id);
     await creatorWallet.save({ session });
 
     let additionalInfo = req.file ? req.file.path : "";
 
     // Create Task
-    const task = await Task.create(
+    const [task] = await Task.create(
       [
         {
           userId: taskCreatorId,
@@ -106,7 +129,7 @@ const createTaskHandler = async (req, res) => {
     await ReserveWallet.create(
       [
         {
-          taskId: task[0]._id, // Use correct task ID
+          taskId: task._id,
           taskCreatorId,
           amount: convertedAmount,
         },
@@ -117,14 +140,23 @@ const createTaskHandler = async (req, res) => {
     await session.commitTransaction(); // Commit the transaction
     session.endSession();
 
-    return res.status(201).json({ status: true, message: "Task created successfully!", task: task[0] });
+    return res.status(201).json({
+      status: true,
+      message: "Task created successfully!",
+      task,
+    });
   } catch (error) {
     await session.abortTransaction(); // Rollback transaction on error
     session.endSession();
-
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    console.error("Create Task Error:", error);
+    
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
 
 
 

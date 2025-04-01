@@ -4,6 +4,7 @@ const { findById } = require("../models/Users");
 const paginate = require("../utils/paginate");
 
 const {Wallet, ReserveWallet} = require("../models/walletModel");
+const Transaction = require("../models/transactionModel");
 const mongoose = require("mongoose");
 
 const createTaskApplication = async (req, res) => {
@@ -176,29 +177,6 @@ const updateReviewStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "Task is not yet completed" });
     }
 
-    // Find Reserved Funds
-    const reservedFunds = await ReserveWallet.findOne({ taskId, taskCreatorId }).session(session);
-    if (!reservedFunds) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "No reserved funds found for this task" });
-    }
-
-    // Find Task Earner's Wallet
-    const taskEarnerWallet = await Wallet.findOne({ userId: taskApplication.earnerId }).session(session);
-    if (!taskEarnerWallet) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "TaskEarner's wallet not found" });
-    }
-
-    // Transfer Funds to Task Earner's Wallet
-    taskEarnerWallet.balance += reservedFunds.amount;
-    await taskEarnerWallet.save({ session });
-
-    // Remove Reserved Funds
-    await ReserveWallet.deleteOne({ _id: reservedFunds._id }).session(session);
-
     // Update Task Application Review Status
     const updateFields = {
       reviewStatus,
@@ -211,21 +189,72 @@ const updateReviewStatus = async (req, res) => {
       { new: true, runValidators: true, session }
     );
 
+    // **Only process fund transfer if the reviewStatus is "Approved"**
+    if (reviewStatus === "Approved") {
+      // Find Reserved Funds
+      const reservedFunds = await ReserveWallet.findOne({ taskId, taskCreatorId }).session(session);
+      if (!reservedFunds) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ success: false, message: "No reserved funds found for this task" });
+      }
+
+      // Find Task Earner's Wallet
+      const taskEarnerWallet = await Wallet.findOne({ userId: taskApplication.earnerId }).session(session);
+      if (!taskEarnerWallet) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ success: false, message: "TaskEarner's wallet not found" });
+      }
+
+      // Transfer Funds to Task Earner's Wallet
+      taskEarnerWallet.balance += reservedFunds.amount;
+
+      // Create Transaction Record
+      const [transaction] = await Transaction.create(
+        [
+          {
+            userId: taskApplication.earnerId,
+            email: taskEarnerWallet.email,
+            amount: reservedFunds.amount,
+            currency: reservedFunds.currency,
+            method: "in-app",
+            paymentType: "credit",
+            status: "successful",
+            reference: `REF_${Date.now()}-altB`,
+          },
+        ],
+        { session }
+      );
+
+      taskEarnerWallet.transactions.push(transaction._id);
+      await taskEarnerWallet.save({ session });
+
+      // Remove Reserved Funds
+      await ReserveWallet.deleteOne({ _id: reservedFunds._id }, { session });
+    }
+
     await session.commitTransaction();
     session.endSession();
 
     return res.status(200).json({
       success: true,
-      message: "Task application review status updated successfully!",
+      message: `Task application review status updated to '${reviewStatus}' successfully!`,
       data: taskApplication,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+    console.error("Update Review Status Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
 
 
 const fetchAllApplicationsEarnerSchema = Joi.object({
