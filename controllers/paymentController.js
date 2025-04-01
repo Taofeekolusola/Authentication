@@ -219,6 +219,23 @@ const getTransactionHistories = async (req, res) => {
 };
 
 
+const PAYMENT_GATEWAYS = {
+  "flutterwave": { requiredFields: ["bankCode", "accountNumber"] },
+  "paypal": { requiredFields: ["paypalEmail"] },
+  "wise": { 
+    requiredFieldsByCurrency: {
+      "NGN": ["accountHolderName", "accountNumber", "bankCode"],
+      "USD": ["accountHolderName", "accountNumber", "routingNumber"],
+      "GBP": ["accountHolderName", "accountNumber", "sortCode"],
+      "EUR": ["accountHolderName", "accountNumber", "IBAN"],
+    },
+    alternativeFields: ["recipientId"]
+  },
+  "stripe-connect": { requiredFields: ["stripeAccountId"] },
+  "stripe-bank": { requiredFields: ["accountHolderName", "accountNumber", "routingNumber"] }
+};
+
+
 // Function to add Payment / Withdrawal Methods Details
 const addPaymentMethod = async (req, res) => {
   try {
@@ -228,22 +245,6 @@ const addPaymentMethod = async (req, res) => {
     }
 
     const { gateway, currency, recipientDetails, country } = req.body;
-
-    const PAYMENT_GATEWAYS = {
-      "flutterwave": { requiredFields: ["bankCode", "accountNumber"] },
-      "paypal": { requiredFields: ["paypalEmail"] },
-      "wise": { 
-        requiredFieldsByCurrency: {
-          "NGN": ["accountHolderName", "accountNumber", "bankCode"],
-          "USD": ["accountHolderName", "accountNumber", "routingNumber"],
-          "GBP": ["accountHolderName", "accountNumber", "sortCode"],
-          "EUR": ["accountHolderName", "accountNumber", "IBAN"],
-        },
-        alternativeFields: ["recipientId"]
-      },
-      "stripe-connect": { requiredFields: ["stripeAccountId"] },
-      "stripe-bank": { requiredFields: ["accountHolderName", "accountNumber", "routingNumber"] }
-    };
 
     // Validate gateway
     if (!PAYMENT_GATEWAYS[gateway]) {
