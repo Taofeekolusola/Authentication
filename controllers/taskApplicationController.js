@@ -11,6 +11,7 @@ const createTaskApplication = async (req, res) => {
   try{
     const { taskId } = req.params;
     const earnerId = req.user._id;
+    const earnerEmail = req.user.email;
     
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
@@ -28,6 +29,7 @@ const createTaskApplication = async (req, res) => {
     const taskApplication = await TaskApplication.create({
       earnerId,
       taskId,
+      email: earnerEmail,
     })
     res.status(201).json({
       success: true,
