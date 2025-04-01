@@ -34,16 +34,16 @@ router.get("/transactions", validation, getTransactionHistoryOfUser);
 router.get("/all-transactions", validation, getTransactionHistories);
 
 // Endpoint to add a payment method
-router.post("/payment-methods", validation, addPaymentMethod);
+router.post("/payment-details", validation, addPaymentMethod);
 
 // Endpoint to get all payment methods for a user
-router.get("/payment-methods", validation, getPaymentMethods);
+router.get("/payment-details", validation, getPaymentMethods);
 
 // Endpoint to update a payment method for a user
-router.put("/payment-methods/:paymentMethodId", validation, updatePaymentMethod);
+router.put("/payment-details/:paymentMethodId", validation, updatePaymentMethod);
 
 // Endpoint to delete a payment method for a user
-router.delete("/payment-methods/:paymentMethodId", validation, deletePaymentMethod);
+router.delete("/payment-details/:paymentMethodId", validation, deletePaymentMethod);
 
 
 module.exports = router;
