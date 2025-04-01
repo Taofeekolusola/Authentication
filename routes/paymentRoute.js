@@ -5,7 +5,11 @@ const {
     getWalletDetails,
     getAllWallet,
     getTransactionHistoryOfUser,
-    getTransactionHistories
+    getTransactionHistories,
+    addPaymentMethod,
+    getPaymentMethods,
+    updatePaymentMethod,
+    deletePaymentMethod,
 } = require("../controllers/paymentController");
 const { validation } = require("../middleware/auth");
 
@@ -28,6 +32,18 @@ router.get("/transactions", validation, getTransactionHistoryOfUser);
 
 // Endpoint to all transactions by an Admin
 router.get("/all-transactions", validation, getTransactionHistories);
+
+// Endpoint to add a payment method
+router.post("/payment-methods", validation, addPaymentMethod);
+
+// Endpoint to get all payment methods for a user
+router.get("/payment-methods", validation, getPaymentMethods);
+
+// Endpoint to update a payment method for a user
+router.put("/payment-methods/:paymentMethodId", validation, updatePaymentMethod);
+
+// Endpoint to delete a payment method for a user
+router.delete("/payment-methods/:paymentMethodId", validation, deletePaymentMethod);
 
 
 module.exports = router;
