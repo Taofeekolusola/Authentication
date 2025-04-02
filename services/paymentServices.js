@@ -209,7 +209,7 @@ class WithdrawalService extends BasePaymentService {
             currency: currency,
             reference: `WDL_${Date.now()}_PMCKDU_1`,
             debit_currency: currency,
-            callback_url: `https://altbucks-ipat.vercel.app/api/v1/webhooks/flutterwave`,
+            callback_url: `https://altbucks-server-t.onrender.com/api/v1/webhooks/flutterwave`,
         };
 
         const response = await this.flutterwaveAPI.post("/transfers", payload);
