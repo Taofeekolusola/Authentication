@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const { Task, TaskApplication } = require("../models/Tasks");
 
 const getAnalyticsOverview = async (req, res) => {
@@ -25,23 +26,63 @@ const getAnalyticsOverview = async (req, res) => {
 
     const totalBudget = totalBudgetAgg.length > 0 ? totalBudgetAgg[0].totalBudget : 0;
 
-    const successfulTasksAgg = await TaskApplication.aggregate([
+    const completedApplicationsCount = await TaskApplication.aggregate([
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "taskId",
+          foreignField: "_id",
+          as: "taskDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$taskDetails",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
       {
         $match: {
-          earnerStatus: "Completed",
+          "taskDetails.userId": taskCreatorId,
+          "earnerStatus": "Completed",
+        },
+      },
+      {
+        $count: "completedApplications",
+      },
+    ]);
+
+    const taskApplicationsCount = await TaskApplication.aggregate([
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "taskId",
+          foreignField: "_id",
+          as: "taskDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$taskDetails",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+      {
+        $match: {
+          "taskDetails.userId": taskCreatorId,
+          "taskDetails.visibility": "Published"
         },
       },
       {
         $group: {
-          _id: "$taskId",
+          _id: null,
+          totalApplications: { $sum: 1 },
         },
       },
-      {
-        $count: "successfulTasks",
-      },
-    ]);
-    const successfulTasks = successfulTasksAgg.length > 0 ? successfulTasksAgg[0].successfulTasks : 0;
-    const taskSuccessRate = totalTasksPosted > 0 ? (successfulTasks / totalTasksPosted) * 100 : 0;
+    ]);    
+    const taskSuccessRate = totalTasksPosted > 0 ? (
+      completedApplicationsCount[0].completedApplications / taskApplicationsCount[0].totalApplications
+    ) * 100 : 0;
 
     res.status(200).json({
       success: true,
@@ -63,7 +104,10 @@ const getCompletedTasksOverTime = async (req, res) => {
   try {
     const creatorId = req.user._id;
     const { range } = req.query;
-    let matchStage = { "taskApplications.earnerStatus": "Completed", userId: creatorId };
+    let matchStage = {
+      "taskApplications.earnerStatus": "Completed", userId: creatorId,
+      visibility: "Published"
+    };
     let groupByFormat;
     let dateFormat;
 
@@ -136,11 +180,28 @@ const getPopularTasksAnalysis = async (req, res) => {
   try {
     const taskCreatorId = req.user._id;
 
-    const result = await Task.aggregate([
-      // Filter tasks by the logged-in user
-      { $match: { userId: taskCreatorId, visibility: "Published" } },
+    const totalRespondentsResult = await Task.aggregate([
+      {
+        $match: {
+          userId: taskCreatorId,
+          visibility: "Published",
+        },
+      },
+      {
+        $group: {
+          _id: "$taskType",
+          totalRespondents: { $sum: "$noOfRespondents" },
+        },
+      },
+    ]);
 
-      // Join with TaskApplication collection
+    const result = await Task.aggregate([
+      {
+        $match: {
+          userId: taskCreatorId,
+          visibility: "Published",
+        },
+      },
       {
         $lookup: {
           from: "taskapplications",
@@ -149,16 +210,17 @@ const getPopularTasksAnalysis = async (req, res) => {
           as: "applications",
         },
       },
-
-      // Unwind applications array to process each application separately
-      { $unwind: { path: "$applications", preserveNullAndEmptyArrays: true } },
-
-      // Group by Task Type
+      {
+        $unwind: {
+          path: "$applications",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
       {
         $group: {
-          _id: "$taskType", // Group by task type
-          taskType: { $first: "$taskType" }, // Store task type
-          posted: { $sum: 1 }, // Count the number of tasks of this type
+          _id: "$taskType",
+          taskType: { $first: "$taskType" },
+          posted: { $sum: 1 },
           completed: {
             $sum: {
               $cond: [{ $eq: ["$applications.earnerStatus", "Completed"] }, 1, 0],
@@ -169,15 +231,13 @@ const getPopularTasksAnalysis = async (req, res) => {
               $cond: [{ $eq: ["$applications.reviewStatus", "Approved"] }, 1, 0],
             },
           },
-          engagement: { $sum: { $cond: [{ $ifNull: ["$applications", false] }, 1, 0] } },
-
-          totalRespondents: { $sum: "$noOfRespondents" },
-
-          // Calculate average duration
+          engagement: {
+            $sum: { $cond: [{ $ifNull: ["$applications", false] }, 1, 0] },
+          },
           averageDuration: {
             $avg: {
               $cond: {
-                if: { $gt: ["$applications.submittedAt", null] }, // Ensure submittedAt is not null
+                if: { $gt: ["$applications.submittedAt", null] },
                 then: { $subtract: ["$applications.submittedAt", "$applications.createdAt"] },
                 else: null,
               },
@@ -185,19 +245,28 @@ const getPopularTasksAnalysis = async (req, res) => {
           },
         },
       },
-
-      // Sort by most posted tasks
-      { $sort: { posted: -1 } },
+      {
+        $sort: { posted: -1 },
+      },
     ]);
 
-    // Format averageDuration into days, hours, and minutes
-    const formattedResult = result.map(({ totalRespondents, engagement, ...task }) => ({
-      ...task,
-      averageDuration: formatDuration(task.averageDuration),
-      engagementPercentage: totalRespondents 
-        ? Math.round((engagement / totalRespondents) * 100)
-        : 0,
-    }));
+    const respondentsMap = totalRespondentsResult.reduce((acc, { _id, totalRespondents }) => {
+      acc[_id] = totalRespondents;
+      return acc;
+    }, {});
+    
+    // Format result with the correct totalRespondents value
+    const formattedResult = result.map(({ taskType, engagement, ...task }) => {
+      const totalRespondents = respondentsMap[taskType] || 0; // Get totalRespondents for this task type
+    
+      return {
+        ...task,
+        averageDuration: formatDuration(task.averageDuration),
+        engagementPercentage: totalRespondents 
+          ? Math.round((engagement / totalRespondents) * 100)
+          : 0,
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -292,108 +361,115 @@ const getWorkerEngagement = async (req, res) => {
 
 const getAverageTaskDuration = async (req, res) => {
   try {
-      const { timeframe } = req.query;
-      const taskCreatorId = req.user._id;
-      let startDate = new Date();
-      let groupByField;
+    const { timeframe } = req.query;
+    const taskCreatorId = req.user._id;
+    let matchStage = { userId: taskCreatorId, visibility: "Published" };
+    let groupByFormat;
+    let dateFormat;
+    const today = new Date();
 
-      // Determine the timeframe and set the startDate
-      switch (timeframe) {
-          case '1year':
-              startDate.setFullYear(startDate.getFullYear() - 1);
-              groupByField = { $dateToString: { format: "%Y", date: "$submittedAt" } }; // Group by year
-              break;
-          case '30days':
-              startDate.setDate(startDate.getDate() - 30);
-              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
-              break;
-          case '7days':
-              startDate.setDate(startDate.getDate() - 7);
-              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
-              break;
-          case 'today':
-              startDate.setHours(0, 0, 0, 0);
-              groupByField = { $dateToString: { format: "%Y-%m-%d", date: "$submittedAt" } }; // Group by day
-              break;
-          default:
-              return res.status(400).json({ success: false, message: 'Invalid timeframe' });
-      }
+    // Determine timeframe
+    if (timeframe === "1year") {
+      matchStage["applications.createdAt"] = { $gte: new Date(today.setFullYear(today.getFullYear() - 1)) };
+      groupByFormat = { year: { $year: "$applications.submittedAt" } };
+      dateFormat = (doc) => `${doc._id.year}`;
+    } else if (timeframe === "30days") {
+      matchStage["applications.createdAt"] = { $gte: new Date(today.setDate(today.getDate() - 30)) };
+      groupByFormat = {
+        year: { $year: "$applications.submittedAt" },
+        month: { $month: "$applications.submittedAt" },
+        day: { $dayOfMonth: "$applications.submittedAt" }
+      };
+      dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}-${String(doc._id.day).padStart(2, "0")}`;
+    } else if (timeframe === "7days") {
+      matchStage["applications.createdAt"] = { $gte: new Date(today.setDate(today.getDate() - 7)) };
+      groupByFormat = {
+        year: { $year: "$applications.submittedAt" },
+        month: { $month: "$applications.submittedAt" },
+        day: { $dayOfMonth: "$applications.submittedAt" }
+      };
+      dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}-${String(doc._id.day).padStart(2, "0")}`;
+    } else if (timeframe === "today") {
+      matchStage["applications.createdAt"] = {
+        $gte: new Date(today.setHours(0, 0, 0, 0)),
+        $lt: new Date(today.setHours(23, 59, 59, 999))
+      };
+      groupByFormat = { hour: { $hour: "$applications.submittedAt" } };
+      dateFormat = (doc) => `${String(doc._id.hour).padStart(2, "0")}:00`;
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid timeframe" });
+    }
 
-      const result = await Task.aggregate([
-          {
-              $match: {
-                  userId: taskCreatorId, // Filter by task creator
-                  visibility: "Published",
-                  createdAt: { $gte: startDate }
-              }
+    // MongoDB aggregation
+    const result = await Task.aggregate([
+      {
+        $lookup: {
+          from: "taskapplications",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "applications"
+        }
+      },
+      { $unwind: "$applications" },
+      {
+        $match: {
+          ...matchStage,
+          "applications.createdAt": { $exists: true, $ne: null },
+          "applications.submittedAt": { $exists: true, $ne: null },
+          "applications.earnerStatus": "Completed"
+        }
+      },
+      {
+        $project: {
+          createdAt: "$applications.createdAt",
+          submittedAt: "$applications.submittedAt"
+        }
+      },
+      {
+        $addFields: {
+          duration: {
+            $divide: [
+              { $subtract: ["$submittedAt", "$createdAt"] },
+              1000
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$applications.submittedAt" }
           },
-          {
-              $lookup: {
-                  from: "taskapplications",
-                  localField: "_id",
-                  foreignField: "taskId",
-                  as: "applications"
-              }
-          },
-          { $unwind: "$applications" }, // Flatten applications array
-          {
-              $match: {
-                  "applications.earnerStatus": "Completed"
-              }
-          },
-          {
-              $project: {
-                  createdAt: "$applications.createdAt",
-                  submittedAt: "$applications.submittedAt"
-              }
-          },
-          {
-              $addFields: {
-                  duration: {
-                      $divide: [
-                          { $subtract: ["$submittedAt", "$createdAt"] }, 
-                          1000 // Convert milliseconds to seconds
-                      ]
-                  }
-              }
-          },
-          {
-              $group: {
-                  _id: groupByField,  // Group based on the selected timeframe (day, month, or year)
-                  totalDuration: { $sum: "$duration" },
-                  count: { $sum: 1 }
-              }
-          },
-          {
-              $project: {
-                  date: "$_id",
-                  averageDuration: { $divide: ["$totalDuration", "$count"] }
-              }
-          },
-          { $sort: { date: 1 } }
-      ]);
+          totalDuration: { $sum: "$duration" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1 } }
+    ]);
 
-      // Convert seconds to days, hours, and minutes
-      const formattedResult = result.map(entry => {
-          const avgDays = Math.floor(entry.averageDuration / 86400);
-          const avgHours = Math.floor((entry.averageDuration % 86400) / 3600);
-          const avgMinutes = Math.floor((entry.averageDuration % 3600) / 60);
+    console.log(result);
+    // Format result
+    const formattedResult = result.map((entry) => {
+      const avgSeconds = entry.totalDuration / entry.count;
+      const avgDays = Math.floor(avgSeconds / 86400);
+      const avgHours = Math.floor((avgSeconds % 86400) / 3600);
+      const avgMinutes = Math.floor((avgSeconds % 3600) / 60);
 
-          return {
-              date: entry.date,
-              averageCompletionTime: `${avgDays}d ${avgHours}h ${avgMinutes}m`
-          };
-      });
+      return {
+        date: dateFormat(entry),
+        averageCompletionTime: `${avgDays}d ${avgHours}h ${avgMinutes}m`
+      };
+    });
 
-      return res.status(200).json({
-          success: true,
-          message: 'Task completion time fetched successfully',
-          data: formattedResult
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Task completion time fetched successfully",
+      data: formattedResult
+    });
 
   } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, message: 'Internal Server Error' });
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
