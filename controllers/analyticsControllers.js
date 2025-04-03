@@ -361,115 +361,111 @@ const getWorkerEngagement = async (req, res) => {
 
 const getAverageTaskDuration = async (req, res) => {
   try {
-    const { timeframe } = req.query;
-    const taskCreatorId = req.user._id;
-    let matchStage = { userId: taskCreatorId, visibility: "Published" };
+    const creatorId = req.user._id;
+    const { range } = req.query;
+    let matchStage = { userId: creatorId, visibility: "Published" };
+    let prevMatchStage = { userId: creatorId, visibility: "Published" };
     let groupByFormat;
     let dateFormat;
+    
     const today = new Date();
+    let previousStartDate;
 
-    // Determine timeframe
-    if (timeframe === "1year") {
-      matchStage["applications.createdAt"] = { $gte: new Date(today.setFullYear(today.getFullYear() - 1)) };
-      groupByFormat = { year: { $year: "$applications.submittedAt" } };
-      dateFormat = (doc) => `${doc._id.year}`;
-    } else if (timeframe === "30days") {
-      matchStage["applications.createdAt"] = { $gte: new Date(today.setDate(today.getDate() - 30)) };
-      groupByFormat = {
-        year: { $year: "$applications.submittedAt" },
-        month: { $month: "$applications.submittedAt" },
-        day: { $dayOfMonth: "$applications.submittedAt" }
-      };
+    if (range === "1y") {
+      const startDate = new Date(today.setFullYear(today.getFullYear() - 1));
+      previousStartDate = new Date(today.setFullYear(today.getFullYear() - 2));
+      matchStage["taskApplications.submittedAt"] = { $gte: startDate };
+      prevMatchStage["taskApplications.submittedAt"] = { $gte: previousStartDate, $lt: startDate };
+      groupByFormat = { year: { $year: "$taskApplications.submittedAt" }, month: { $month: "$taskApplications.submittedAt" } };
+      dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}`;
+    } else if (range === "30d") {
+      const startDate = new Date(today.setDate(today.getDate() - 30));
+      previousStartDate = new Date(today.setDate(today.getDate() - 60));
+      matchStage["taskApplications.submittedAt"] = { $gte: startDate };
+      prevMatchStage["taskApplications.submittedAt"] = { $gte: previousStartDate, $lt: startDate };
+      groupByFormat = { year: { $year: "$taskApplications.submittedAt" }, month: { $month: "$taskApplications.submittedAt" }, day: { $dayOfMonth: "$taskApplications.submittedAt" } };
       dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}-${String(doc._id.day).padStart(2, "0")}`;
-    } else if (timeframe === "7days") {
-      matchStage["applications.createdAt"] = { $gte: new Date(today.setDate(today.getDate() - 7)) };
-      groupByFormat = {
-        year: { $year: "$applications.submittedAt" },
-        month: { $month: "$applications.submittedAt" },
-        day: { $dayOfMonth: "$applications.submittedAt" }
-      };
+    } else if (range === "7d") {
+      const startDate = new Date(today.setDate(today.getDate() - 7));
+      previousStartDate = new Date(today.setDate(today.getDate() - 14));
+      matchStage["taskApplications.submittedAt"] = { $gte: startDate };
+      prevMatchStage["taskApplications.submittedAt"] = { $gte: previousStartDate, $lt: startDate };
+      groupByFormat = { year: { $year: "$taskApplications.submittedAt" }, month: { $month: "$taskApplications.submittedAt" }, day: { $dayOfMonth: "$taskApplications.submittedAt" } };
       dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}-${String(doc._id.day).padStart(2, "0")}`;
-    } else if (timeframe === "today") {
-      matchStage["applications.createdAt"] = {
-        $gte: new Date(today.setHours(0, 0, 0, 0)),
-        $lt: new Date(today.setHours(23, 59, 59, 999))
-      };
-      groupByFormat = { hour: { $hour: "$applications.submittedAt" } };
+    } else if (range === "today") {
+      const startDate = new Date(today.setHours(0, 0, 0, 0));
+      previousStartDate = new Date(today.setDate(today.getDate() - 1));
+      matchStage["taskApplications.submittedAt"] = { $gte: startDate };
+      prevMatchStage["taskApplications.submittedAt"] = { $gte: previousStartDate, $lt: startDate };
+      groupByFormat = { hour: { $hour: "$taskApplications.submittedAt" } };
       dateFormat = (doc) => `${String(doc._id.hour).padStart(2, "0")}:00`;
     } else {
-      return res.status(400).json({ success: false, message: "Invalid timeframe" });
+      return res.status(400).json({ success: false, message: "Invalid range provided" });
     }
 
-    // MongoDB aggregation
-    const result = await Task.aggregate([
-      {
-        $lookup: {
-          from: "taskapplications",
-          localField: "_id",
-          foreignField: "taskId",
-          as: "applications"
-        }
-      },
-      { $unwind: "$applications" },
-      {
-        $match: {
-          ...matchStage,
-          "applications.createdAt": { $exists: true, $ne: null },
-          "applications.submittedAt": { $exists: true, $ne: null },
-          "applications.earnerStatus": "Completed"
-        }
-      },
-      {
-        $project: {
-          createdAt: "$applications.createdAt",
-          submittedAt: "$applications.submittedAt"
-        }
-      },
-      {
-        $addFields: {
-          duration: {
-            $divide: [
-              { $subtract: ["$submittedAt", "$createdAt"] },
-              1000
-            ]
-          }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$applications.submittedAt" }
+    const getAverageDuration = async (match) => {
+      const result = await Task.aggregate([
+        {
+          $lookup: {
+            from: "taskapplications",
+            localField: "_id",
+            foreignField: "taskId",
+            as: "taskApplications",
           },
-          totalDuration: { $sum: "$duration" },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id.year": 1 } }
-    ]);
+        },
+        { $unwind: "$taskApplications" },
+        { $match: match },
+        {
+          $group: {
+            _id: groupByFormat,
+            averageDuration: {
+              $avg: {
+                $cond: {
+                  if: { $gt: ["$taskApplications.submittedAt", null] },
+                  then: { $subtract: ["$taskApplications.submittedAt", "$taskApplications.createdAt"] },
+                  else: null,
+                },
+              },
+            },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1, "_id.hour": 1 } },
+      ]);
 
-    console.log(result);
-    // Format result
-    const formattedResult = result.map((entry) => {
-      const avgSeconds = entry.totalDuration / entry.count;
-      const avgDays = Math.floor(avgSeconds / 86400);
-      const avgHours = Math.floor((avgSeconds % 86400) / 3600);
-      const avgMinutes = Math.floor((avgSeconds % 3600) / 60);
+      return result;
+    };
 
-      return {
-        date: dateFormat(entry),
-        averageCompletionTime: `${avgDays}d ${avgHours}h ${avgMinutes}m`
-      };
-    });
+    // Fetch current period average duration
+    const currentPeriodResult = await getAverageDuration(matchStage);
+    const formattedCurrentPeriod = currentPeriodResult.map((doc) => ({
+      date: dateFormat(doc),
+      averageDuration: doc.averageDuration ? formatDuration(doc.averageDuration) : 0,
+    }));
 
-    return res.status(200).json({
+    // Fetch previous period average duration
+    const previousPeriodResult = await getAverageDuration(prevMatchStage);
+    const totalCurrentDuration = currentPeriodResult.reduce((acc, doc) => acc + (doc.averageDuration || 0), 0);
+    const totalPreviousDuration = previousPeriodResult.reduce((acc, doc) => acc + (doc.averageDuration || 0), 0);
+
+    // Calculate percentage change
+    const percentageChange = totalPreviousDuration
+      ? ((totalCurrentDuration - totalPreviousDuration) / totalPreviousDuration) * 100
+      : totalCurrentDuration > 0
+        ? 100
+        : 0;
+
+    res.status(200).json({
       success: true,
-      message: "Task completion time fetched successfully",
-      data: formattedResult
+      message: "Average task duration fetched successfully",
+      data: {
+        averageDurations: formattedCurrentPeriod,
+        totalAverageDuration: formatDuration(totalCurrentDuration/currentPeriodResult.length),
+        percentageChange: `${percentageChange.toFixed(2)}%`,
+      },
     });
-
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
