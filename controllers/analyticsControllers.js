@@ -290,21 +290,21 @@ const formatDuration = (milliseconds) => {
 
 const getWorkerEngagement = async (req, res) => {
   try {
-    const { timeframe } = req.query;
+    const { range } = req.query;
     const taskCreatorId = req.user._id;
 
     // Determine the start date based on the timeframe
     let startDate = new Date();
-    switch (timeframe) {
-      case "1year":
+    switch (range) {
+      case "1y":
         startDate.setFullYear(startDate.getFullYear() - 1);
         groupByFormat = "%Y-%m"; // Group by Year-Month
         break;
-      case "30days":
+      case "30d":
         startDate.setDate(startDate.getDate() - 30);
         groupByFormat = "%Y-%m-%d"; // Group by Day
         break;
-      case "7days":
+      case "7d":
         startDate.setDate(startDate.getDate() - 7);
         groupByFormat = "%Y-%m-%d"; // Group by Day
         break;
@@ -313,7 +313,7 @@ const getWorkerEngagement = async (req, res) => {
         groupByFormat = "%Y-%m-%d"; // Group by Day
         break;
       default:
-        return res.status(400).json({ success: false, message: "Invalid timeframe" });
+        return res.status(400).json({ success: false, message: "Invalid range" });
     }
 
     const result = await Task.aggregate([
@@ -335,22 +335,27 @@ const getWorkerEngagement = async (req, res) => {
       {
         $group: {
           _id: { $dateToString: { format: groupByFormat, date: "$createdAt" } },
-          count: { $sum: { $size: "$applications" } } // Total workers engaged per date
+          count: { $sum: { $size: "$applications" } }
         }
       },
-      { $sort: { _id: 1 } } // Sort by date
+      { $sort: { _id: 1 } }
     ]);
 
-    // Format response
     const formattedResult = result.map(entry => ({
       date: entry._id,
       count: entry.count
     }));
 
+    const totalWorkers = result.reduce((sum, entry) => sum + entry.count, 0);
+    const averageWorkerPerTask = totalWorkers > 0 ? totalWorkers/result.length : 0;
+
     res.status(200).json({
       success: true,
       message: "Worker engagement over time fetched successfully",
-      data: formattedResult
+      data: {
+        averageWorkerPerTask, 
+        workerEngagements: formattedResult
+      }
     });
 
   } catch (error) {
