@@ -135,9 +135,11 @@ const getCompletedTasksOverTime = async (req, res) => {
       };
       groupByFormat = { hour: { $hour: "$taskApplications.submittedAt" } };
       dateFormat = (doc) => `${String(doc._id.hour).padStart(2, "0")}:00`;
-    } else {
+    } else if (range === "all") {
       groupByFormat = { year: { $year: "$taskApplications.submittedAt" }, month: { $month: "$taskApplications.submittedAt" } };
       dateFormat = (doc) => `${doc._id.year}-${String(doc._id.month).padStart(2, "0")}`;
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid range" });
     }
 
     const completedTasks = await Task.aggregate([
