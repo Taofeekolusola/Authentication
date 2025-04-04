@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "type": "commonjs",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
@@ -26,6 +27,7 @@
     "express-session": "^1.18.1",
     "fs": "^0.0.1-security",
     "gridfs-stream": "^1.1.1",
+    "html-pdf-node": "^1.0.8",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.10.1",
