@@ -28,7 +28,7 @@ connectDB();
 const allowedOrigins = [
     'http://localhost:3000',
     'https://altbucks-ipat.vercel.app',
-    'https://alt-bucks.vercel.app/',
+    'https://alt-bucks.vercel.app',
     'https://authentication-1-bqvg.onrender.com'
 ];
 
