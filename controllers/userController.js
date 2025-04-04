@@ -401,8 +401,6 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    console.log("🔍 req.user in getUserProfile:", req.user);
-
     if (!req.user || !req.user._id) {
       console.log("req.user is missing or invalid");
       return res.status(401).json({ message: "Unauthorized" });
