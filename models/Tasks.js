@@ -22,7 +22,7 @@ const TaskSchema = new mongoose.Schema(
     visibility: {
       type: String,
       enum: ["Published", "Draft"],
-      default: "Draft",
+      default: "Published",
     },
     postedAt: {
       type: Date,
