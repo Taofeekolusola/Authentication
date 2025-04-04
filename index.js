@@ -12,6 +12,7 @@ const authRoutes = require("./routes/authRoutes");
 const referralRoutes = require("./routes/referralRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const inAppNotificationRoutes = require("./routes/inAppNotificationRoutes");
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
@@ -104,11 +105,12 @@ app.use('/api/v1/auth', authRoutes);
 app.use("/api/v1/referrals", referralRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/notifications", inAppNotificationRoutes);
 app.use('/uploads', express.static('uploads'));
 
 // Handle undefined routes
 app.use((req, res) => {
-    res.status(404).json({ message: 'Route not found' });
+    res.status(404).json({ status: false, message: 'Route not found' });
 });
 
 
