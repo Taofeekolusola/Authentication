@@ -31,4 +31,4 @@ const generateEarningsPDF = async (report, user) => {
 };
 
 
-module.exports = { generateEarningsPDF };
+module.exports = {generateEarningsPDF};

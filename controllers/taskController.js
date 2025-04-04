@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 const { generateEarningsPDF } = require('../services/pdfService');
+const {TaskApplication}= require("../models/Tasks")
 
 const {
   createTaskValidationSchema,
@@ -349,7 +350,7 @@ const getCompletedTasksHandler = async (req, res) => {
 };
 
 
-const getTaskCreatorDashboard = async (req, res) => { try { const { userId } = req.query;
+/*const getTaskCreatorDashboard = async (req, res) => { try { const { userId } = req.query;
 if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
   return res.status(400).json({ error: "Invalid user ID", details: "Must provide a valid MongoDB ObjectId" });
 }
@@ -484,6 +485,259 @@ const fetchUser = async (userId) => {
     return null;
   }
 }
+*/
+const getTaskCreatorDashboard = async (req, res) => {
+  try {
+    const { userId, wipPage = 1, wipLimit = 5, chartRange = 'weekly' } = req.query;
+
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID", details: "Must provide a valid MongoDB ObjectId" });
+    }
+
+
+    const creatorObjectId = new mongoose.Types.ObjectId(userId);
+
+
+    const result = await Task.aggregate([
+      { $match: { userId: creatorObjectId } },
+      {
+        $lookup: {
+          from: "taskapplications",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "applications"
+        }
+      },
+      {
+        $addFields: {
+          approvedCompletions: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: {
+                $and: [
+                  { $eq: ["$$app.earnerStatus", "Completed"] },
+                  { $eq: ["$$app.reviewStatus", "Approved"] }
+                ]
+              }
+            }
+          },
+          inProgressApps: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: { $eq: ["$$app.earnerStatus", "In Progress"] }
+            }
+          },
+          cancelledApps: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: { $eq: ["$$app.earnerStatus", "Cancelled"] }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpent: {
+            $sum: {
+              $multiply: [
+                { $size: "$approvedCompletions" },
+                { $ifNull: ["$compensation.amount", 0] }
+              ]
+            }
+          },
+          totalTasks: { $sum: 1 },
+          inProgressTasks: { $sum: { $cond: [{ $gt: [{ $size: "$inProgressApps" }, 0] }, 1, 0] } },
+          completedTasks: { $sum: { $cond: [{ $gt: [{ $size: "$approvedCompletions" }, 0] }, 1, 0] } },
+          cancelledTasks: { $sum: { $cond: [{ $gt: [{ $size: "$cancelledApps" }, 0] }, 1, 0] } }
+        }
+      }
+    ]);
+
+
+    const {
+      totalSpent = 0,
+      totalTasks = 0,
+      inProgressTasks = 0,
+      completedTasks = 0,
+      cancelledTasks = 0
+    } = result[0] || {};
+
+
+    // Paginate WIP tasks
+    const skip = (parseInt(wipPage) - 1) * parseInt(wipLimit);
+    const wipTasksQuery = await Task.find({ userId, status: 'In Progress' })
+      .skip(skip)
+      .limit(parseInt(wipLimit))
+      .select('-__v');
+
+
+    const wipTotalCount = await Task.countDocuments({ userId, status: 'In Progress' });
+
+
+    // Profile completion
+    const profileCompletion = await getProfileCompletion(userId);
+
+
+    // Report
+    const report = await getTaskReport(userId, 'all');
+
+
+    // Chart
+    const chartData = await getTaskChartData(userId, chartRange);
+
+
+    res.json({
+      userId,
+      totalSpent,
+      currency: "USD",
+      numberOfTasks: totalTasks,
+      inProgressTasks,
+      completedTasks,
+      cancelledTasks,
+      profileCompletion: profileCompletion.toFixed(1) + "%",
+      report,
+      chartData,
+      wipTasks: {
+        currentPage: parseInt(wipPage),
+        totalPages: Math.ceil(wipTotalCount / parseInt(wipLimit)),
+        count: wipTasksQuery.length,
+        total: wipTotalCount,
+        tasks: wipTasksQuery
+      },
+      metric: "tasks",
+      timestamp: new Date().toISOString()
+    });
+
+
+  } catch (error) {
+    console.error(`[GET /tasks/dashboard] Error: ${error.message}`);
+    res.status(500).json({
+      error: "Failed to fetch task creator dashboard.",
+      systemMessage: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+const getProfileCompletion = async (userId) => {
+  try{
+    const creator = await User.findById(userId, "userImageUrl firstName lastName bio languages expertise location");
+    const profileFields = ["userImageUrl", "firstName", "lastName", "bio", "languages", "expertise", "location"];
+    const filledFields = profileFields.filter((field) => creator[field]);
+    const profileCompletion = (filledFields.length / profileFields.length) * 100;
+    return profileCompletion;
+  }
+  catch (error) {
+    console.error(error);
+  }
+}
+
+const getTaskReport = async (userId, range = 'all', options = {}) => {
+  const { includeTasks = false, status = 'Completed' } = options;
+  let dateFilter = {};
+
+
+  switch (range) {
+    case 'today':
+      dateFilter = { completedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } };
+      break;
+    case '7days':
+      dateFilter = { completedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } };
+      break;
+    case '30days':
+      dateFilter = { completedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } };
+      break;
+    case 'custom':
+      if (options.start && options.end) {
+        dateFilter = { completedAt: { $gte: new Date(options.start), $lte: new Date(options.end) } };
+      }
+      break;
+    case 'all':
+    default:
+      break;
+  }
+
+
+  const query = {
+    userId,
+    ...(status && { status }),
+    ...dateFilter
+  };
+
+
+  const tasks = await Task.find(query);
+
+
+  const totalEarnings = tasks.reduce((sum, task) => sum + (task.compensation || 0), 0);
+
+
+  return {
+    timeRange: range,
+    totalTasks: tasks.length,
+    totalEarnings,
+    currency: "USD",
+    ...(includeTasks && { tasks })
+  };
+};
+
+const getTaskChartData = async (userId, timeframe = 'weekly', options = {}) => {
+  let groupFormat, dateSubtract;
+  const { status = 'Completed' } = options;
+
+
+  switch (timeframe) {
+    case 'weekly':
+      groupFormat = "%Y-%U"; // Year-Week
+      dateSubtract = 12 * 7 * 24 * 60 * 60 * 1000;
+      break;
+    case 'monthly':
+      groupFormat = "%Y-%m";
+      dateSubtract = 12 * 30 * 24 * 60 * 60 * 1000;
+      break;
+    case 'daily':
+    default:
+      groupFormat = "%Y-%m-%d";
+      dateSubtract = 30 * 24 * 60 * 60 * 1000;
+  }
+
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error("Invalid userId format");
+  }
+
+
+  const chartData = await Task.aggregate([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        ...(status && { status }),
+        completedAt: { $gte: new Date(Date.now() - dateSubtract) }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          date: { $dateToString: { format: groupFormat, date: "$completedAt" } }
+        },
+        earnings: { $sum: "$compensation" },
+        taskCount: { $sum: 1 }
+      }
+    },
+    { $sort: { "_id.date": 1 } }
+  ]);
+
+
+  return chartData.map(item => ({
+    date: item._id.date,
+    earnings: item.earnings,
+    taskCount: item.taskCount
+  }));
+};
 
 const generateTaskReportPDF = async (req, res) => {
   try {
