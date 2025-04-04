@@ -15,7 +15,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 require('dotenv').config();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-
+const logger = require('./middleware/logger');
 
 
 
@@ -87,6 +87,7 @@ app.use(cookieParser());
 // Middleware
 app.use(express.json()); // Parse JSON request body
 app.use(express.urlencoded({ extended: true }));
+app.use(logger);
 
 app.get('/', async (req, res) => {
     return res.send("Welcome to The Alternative Bucks! API");
