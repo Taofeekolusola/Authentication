@@ -1,13 +1,17 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
 const  User = require('../models/Users');
-//const taskService = require("../services/taskServices")
 const paginate = require("../utils/paginate");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 const { generateEarningsPDF } = require('../services/pdfService');
 const {TaskApplication}= require("../models/Tasks")
+const { convertUsdToNgn, convertEurToNgn } = require("../helpers/helpers");
+
+const {Wallet, ReserveWallet} = require("../models/walletModel");
+const Transaction = require("../models/transactionModel");
+
 
 const {
   createTaskValidationSchema,
@@ -15,30 +19,149 @@ const {
   searchTasksSchema
 } = require("../validations/taskValidation");
 
+// const createTaskHandler = async (req, res) => {
+//   try {
+//     const taskCreatorId = req.user._id;
+//     const { error, value } = createTaskValidationSchema.validate(req.body, {
+//       abortEarly: false,
+//       allowUnknown: true,
+//     });
+//     if (error) {
+//       return res.status(400).json({ error: error.details.map((d) => d.message) });
+//     }
+
+//     let additionalInfo = req.file ? req.file.path : "";
+
+//     const task = await Task.create({
+//       userId: taskCreatorId,
+//       ...value,
+//       additionalInfo,
+//     });
+
+//     res.status(201).json({ status: true, message: "Task created successfully!", task });
+//   } catch (error) {
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// };
+
+
+// Create Task Handler
 const createTaskHandler = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction(); // Start atomic transaction
+
   try {
     const taskCreatorId = req.user._id;
     const { error, value } = createTaskValidationSchema.validate(req.body, {
       abortEarly: false,
       allowUnknown: true,
     });
+
     if (error) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: error.details.map((d) => d.message) });
     }
 
+    const { compensation } = value;
+
+    // Validate TaskCreator Wallet Balance
+    const creatorWallet = await Wallet.findOne({ userId: taskCreatorId }).session(session);
+    if (!creatorWallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: "Wallet not found for TaskCreator" });
+    }
+
+    let convertedAmount;
+
+    if (compensation.currency === "USD") {
+      convertedAmount = await convertUsdToNgn(compensation.amount);
+    } else if (compensation.currency === "EUR") {
+      convertedAmount = await convertEurToNgn(compensation.amount);
+    } else {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: "Invalid currency. Only USD & EUR are accepted." });
+    }
+
+    if (creatorWallet.balance < convertedAmount) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: "Insufficient balance to create task" });
+    }
+
+    // Deduct TaskCreator's balance & move funds to ReserveWallet
+    creatorWallet.balance -= convertedAmount;
+
+    // Save Transaction
+    const [transaction] = await Transaction.create(
+      [
+        {
+          userId: taskCreatorId,
+          email: creatorWallet.email,
+          amount: convertedAmount,
+          currency: "NGN",
+          method: "in-app",
+          paymentType: "debit",
+          status: "successful",
+          reference: `REF_${Date.now()}-altB`,
+        },
+      ],
+      { session }
+    );
+
+    creatorWallet.transactions.push(transaction._id);
+    await creatorWallet.save({ session });
+
     let additionalInfo = req.file ? req.file.path : "";
 
-    const task = await Task.create({
-      userId: taskCreatorId,
-      ...value,
-      additionalInfo,
-    });
+    // Create Task
+    const [task] = await Task.create(
+      [
+        {
+          userId: taskCreatorId,
+          ...value,
+          additionalInfo,
+        },
+      ],
+      { session }
+    );
 
-    res.status(201).json({ status: true, message: "Task created successfully!", task });
+    // Create ReserveWallet Entry
+    await ReserveWallet.create(
+      [
+        {
+          taskId: task._id,
+          taskCreatorId,
+          amount: convertedAmount,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction(); // Commit the transaction
+    session.endSession();
+
+    return res.status(201).json({
+      status: true,
+      message: "Task created successfully!",
+      task,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    await session.abortTransaction(); // Rollback transaction on error
+    session.endSession();
+    console.error("Create Task Error:", error);
+    
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
+
+
 
 // Update Task Handler
 const updateTaskHandler = async (req, res) => {
@@ -349,147 +472,9 @@ const getCompletedTasksHandler = async (req, res) => {
   }
 };
 
-
-/*const getTaskCreatorDashboard = async (req, res) => { try { const { userId } = req.query;
-if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-  return res.status(400).json({ error: "Invalid user ID", details: "Must provide a valid MongoDB ObjectId" });
-}
-
-const tasks = await Task.find({ userId });
-const totalSpent = tasks.reduce((sum, task) => sum + (task.compensation || task.amount || 0), 0);
-
-const wipTasks = await Task.find({ userId, status: 'In Progress' }).select('-__v');
-
-const taskCompleted = await Task.countDocuments({
-  userId: new mongoose.Types.ObjectId(userId),
-  completedAt: { $exists: true }
-});
-
-
-res.json({
-  userId,
-  totalSpent,
-  currency: "USD",
-  numberOfTasks: tasks.length,
-  wipTasks: {
-    count: wipTasks.length,
-    tasks: wipTasks
-  },
-  taskCompleted,
-  metric: "tasks",
-  timestamp: new Date().toISOString()
-});
-
-
-} catch (error) {
-   console.error(`[GET /tasks/dashboard] Error: ${error.message}`);
-    res.status(500).json({ 
-      error: "Failed to fetch task creator dashboard.", 
-      systemMessage: process.env.NODE_ENV === 'development' ? error.message : undefined, 
-      timestamp: new Date().toISOString() 
-    }); 
-  } 
-};
-
-const getTaskReport = async (userId, range) => {
-  let dateFilter = {};
-
-  switch (range) {
-    case 'today':
-      dateFilter = { completedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } };
-      break;
-    case '7days':
-      dateFilter = { completedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } };
-      break;
-    case '30days':
-      dateFilter = { completedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } };
-      break;
-    case 'all':
-    default:
-      break;
-  }
-
-
-  const tasks = await Task.find({ userId, status: 'Completed', ...dateFilter });
-  const totalEarnings = tasks.reduce((sum, task) => sum + (task.compensation || 0), 0);
-
-
-  return {
-    timeRange: range,
-    totalTasks: tasks.length,
-    totalEarnings,
-    currency: "USD",
-    tasks, // Optional: Include task details if needed
-  };
-};
-
-
-const getTaskChartData = async (userId, timeframe) => {
-  let groupFormat, dateSubtract;
-
-
-  switch (timeframe) {
-    case 'weekly':
-      groupFormat = "%Y-%U"; // Year-Week
-      dateSubtract = 12 * 7 * 24 * 60 * 60 * 1000; // 12 weeks
-      break;
-    case 'monthly':
-      groupFormat = "%Y-%m"; // Year-Month
-      dateSubtract = 12 * 30 * 24 * 60 * 60 * 1000; // 12 months
-      break;
-    default: // Daily
-      groupFormat = "%Y-%m-%d";
-      dateSubtract = 30 * 24 * 60 * 60 * 1000; // 30 days
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(userId))
-  {
-    throw new Error("Invalid userId fromat");
-  }
-
-
-  const chartData = await Task.aggregate([
-    {
-      $match: {
-        userId: new mongoose.Types.ObjectId(userId),
-        status: 'Completed',
-        completedAt: { $gte: new Date(Date.now() - dateSubtract) },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          date: { $dateToString: { format: groupFormat, date: "$completedAt" } },
-        },
-        earnings: { $sum: "$compensation" },
-        taskCount: { $sum: 1 },
-      },
-    },
-    { $sort: { "_id.date": 1 } },
-  ]);
-
-
-  return chartData.map(item => ({
-    date: item._id.date,
-    earnings: item.earnings,
-    taskCount: item.taskCount,
-  }));
-};
-
-
-const fetchUser = async (userId) => {
-  try {
-    return await User.findById(userId);
-  } catch (error) {
-    console.error("Error fetching user:", error);
-    return null;
-  }
-}
-*/
 const getTaskCreatorDashboard = async (req, res) => {
   try {
     const { userId, wipPage = 1, wipLimit = 5, chartRange = 'weekly' } = req.query;
-
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: "Invalid user ID", details: "Must provide a valid MongoDB ObjectId" });
@@ -662,19 +647,14 @@ const getTaskReport = async (userId, range = 'all', options = {}) => {
       break;
   }
 
-
   const query = {
     userId,
     ...(status && { status }),
     ...dateFilter
   };
 
-
   const tasks = await Task.find(query);
-
-
   const totalEarnings = tasks.reduce((sum, task) => sum + (task.compensation || 0), 0);
-
 
   return {
     timeRange: range,

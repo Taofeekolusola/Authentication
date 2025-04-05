@@ -11,7 +11,7 @@ const Settings = require("../models/Settings");
 const { generateAlphanumericCode } = require("../helpers/helpers");
 const ReferralModel = require("../models/referralModel");
 const { TaskApplication, Task } = require("../models/Tasks");
-const Wallet = require("../models/walletModel");
+const {Wallet} = require("../models/walletModel");
 const mongoose = require("mongoose");
 
 // Signup for Task Earner
@@ -401,8 +401,6 @@ const resetPassword = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    console.log("🔍 req.user in getUserProfile:", req.user);
-
     if (!req.user || !req.user._id) {
       console.log("req.user is missing or invalid");
       return res.status(401).json({ message: "Unauthorized" });

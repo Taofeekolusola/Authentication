@@ -10,6 +10,10 @@ const {
   postTaskHandler,
   getTaskCreatorDashboard,
   generateTaskReportPDF,
+  getInProgressTasksHandler,
+  getCompletedTasksHandler,
+  getTaskCreatorAmountSpentHandler,
+  getAvailableTasksHandler,
 } = require("../controllers/taskController");
 const upload = require("../middleware/multer");
 const isTaskCreator = require("../middleware/isTaskCreator");
@@ -52,6 +56,7 @@ route.post("/search", validation, isTaskEarner, searchAllTasksHandler);
 // Post an already created task (creator)
 route.patch("/:taskId/post", validation, isTaskCreator, taskOwner, postTaskHandler);
 
+route.get("/generateTaskReportPDF", validation, generateTaskReportPDF);
 
 // Task Applications Routes
 
