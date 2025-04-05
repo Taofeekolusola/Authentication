@@ -41,12 +41,13 @@ route.delete("/:taskId", validation, isTaskCreator, taskOwner, deleteTaskHandler
 route.get("/all", validation, isTaskEarner, getAllTasksHandler);
 route.get("/", validation, isTaskCreator, getTaskCreatorTasksHandler);
 route.get('/task-creator/dashboard', validation, getTaskCreatorDashboard);
+route.get("/generateTaskReportPDF", validation, generateTaskReportPDF);
 
 // Get all completed tasks (earner)
-route.get("/completed", validation, isTaskEarner, getCompletedTasksHandler);
+//route.get("/completed", validation, isTaskEarner, getCompletedTasksHandler);
 
 // Get all tasks in progress (earner)
-route.get("/in-progress", validation, isTaskEarner, getInProgressTasksHandler);
+//route.get("/in-progress", validation, isTaskEarner, getInProgressTasksHandler);
 
 
 // Search for available tasks (earner)

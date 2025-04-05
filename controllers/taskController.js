@@ -1,14 +1,17 @@
 const mongoose = require("mongoose");
 const { Task } = require("../models/Tasks");
-//const taskService = require("../services/taskServices")
+const  User = require('../models/Users');
 const paginate = require("../utils/paginate");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const { generateEarningsPDF } = require('../services/pdfService');
+const {TaskApplication}= require("../models/Tasks")
 const { convertUsdToNgn, convertEurToNgn } = require("../helpers/helpers");
 
 const {Wallet, ReserveWallet} = require("../models/walletModel");
 const Transaction = require("../models/transactionModel");
+
 
 const {
   createTaskValidationSchema,
@@ -469,295 +472,284 @@ const getCompletedTasksHandler = async (req, res) => {
   }
 };
 
-// const getTaskCreatorDashboard = async (req, res) => {
-//   try {
-//     const { userId, exportPdf } = req.query;
-    
-//     if (!userId) {
-//       return res.status(400).json({ success: false, message: "User ID is required" });
-//     }
-
-
-//     // Fetch all tasks created by the user
-//     const tasks = await Task.find({ userId });
-
-
-//     // Calculate Amount Spent
-//     const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
-
-
-//     // Work In Progress (WIP) & Completed Tasks Count
-//     const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
-//     const completedTasks = tasks.filter(task => task.status === "completed").length;
-
-
-//     // Spending Over Time (Graph Data & Task Earning Report)
-//     const spendingOverTime = {
-//       graphData: tasks.map(task => ({
-//         date: task.createdAt,
-//         amount: task.compensation.amount || 0,
-//       })),
-//       taskEarningReport: {
-//         allTime: totalAmountSpent,
-//         last30Days: tasks
-//           .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
-//           .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
-//         last7Days: tasks
-//           .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-//           .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
-//         today: tasks
-//           .filter(task => new Date(task.createdAt).toDateString() === new Date().toDateString())
-//           .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
-//       },
-//     };
-
-
-//     // If exportPdf is requested, generate and return a PDF
-//     if (exportPdf === "true") {
-//       const exportsDir = path.join(__dirname, "../exports");
-
-
-//       // Ensure the "exports" directory exists
-//       if (!fs.existsSync(exportsDir)) {
-//         fs.mkdirSync(exportsDir, { recursive: true });
-//       }
-
-//       const pdfFileName = `spending_over_time_${userId}.pdf`;
-//       const pdfPath = path.join(exportsDir, pdfFileName);
-//       const doc = new PDFDocument();
-//       const stream = fs.createWriteStream(pdfPath);
-//       doc.pipe(stream);
-
-
-//       // PDF Content
-//       doc.fontSize(18).text("Spending Over Time Report", { align: "center" }).moveDown();
-//       doc.fontSize(14).text(`Total Amount Spent: $${totalAmountSpent}`);
-//       doc.text(`Work In Progress Tasks: ${workInProgressTasks}`);
-//       doc.text(`Completed Tasks: ${completedTasks}`).moveDown();
-//       doc.text("Task Earning Report:");
-//       doc.text(`All Time: $${spendingOverTime.taskEarningReport.allTime}`);
-//       doc.text(`Last 30 Days: $${spendingOverTime.taskEarningReport.last30Days}`);
-//       doc.text(`Last 7 Days: $${spendingOverTime.taskEarningReport.last7Days}`);
-//       doc.text(`Today: $${spendingOverTime.taskEarningReport.today}`).moveDown();
-//       doc.text("Spending Over Time Graph Data:");
-//       spendingOverTime.graphData.forEach(entry => {
-//         doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}`);
-//       });
-
-
-//       doc.end();
-
-
-//       // Wait for PDF to be created before sending response
-//       stream.on("finish", () => {
-//         const pdfUrl = `http://yourserver.com/exports/${pdfFileName}`;
-//         return res.status(200).json({
-//           success: true,
-//           message: "PDF generated successfully",
-//           pdfUrl, // Send the URL instead of the file
-//         });
-//       });
-    
-    
-//       return;
-//     }
-  
-//     // Return JSON response
-//     res.status(200).json({
-//       success: true,
-//       dashboardData: {
-//         totalAmountSpent,
-//         workInProgressTasks,
-//         completedTasks,
-//         spendingOverTime,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error:", error);
-//     res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
-//   }
-// };
-
 const getTaskCreatorDashboard = async (req, res) => {
   try {
-    const { userId, exportPdf } = req.query;
+    const { userId, wipPage = 1, wipLimit = 5, chartRange = 'weekly' } = req.query;
 
-
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID", details: "Must provide a valid MongoDB ObjectId" });
     }
 
 
-    // Fetch tasks created by the user
-    const tasks = await Task.find({ userId });
+    const creatorObjectId = new mongoose.Types.ObjectId(userId);
 
 
-    // Calculate Amount Spent
-    const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
-
-
-    // Work In Progress & Completed Tasks Count
-    const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
-    const completedTasks = tasks.filter(task => task.status === "completed").length;
-
-
-    // Task Total
-    const taskTotal = {
-      labels: ["Cancelled", "Pending", "Completed"],
-      datasets: [
-        tasks.filter(task => task.status === "cancelled").length,
-        tasks.filter(task => task.status === "pending").length,
-        completedTasks,
-      ],
-    };
-
-
-    // Spending Over Time (Graph Data & Task Earning Report)
-    const spendingOverTime = {
-      graphData: tasks.map(task => ({
-        date: task.createdAt,
-        amount: task.compensation.amount || 0,
-        category: task.category || "Uncategorized",
-        status: task.status,
-        taskTitle: task.title,
-        taskId: task._id,
-        creatorId: task.userId,
-        assignedUser: task.assignedTo || "Unassigned",
-        completionTime: task.completedAt || null,
-        duration: task.completedAt
-          ? (new Date(task.completedAt) - new Date(task.createdAt)) / (1000 * 60 * 60) // Duration in hours
-          : null,
-        paymentStatus: task.paymentStatus || "Pending",
-        earningsByDay: task.earningsByDay || [],
-      })),
-      taskEarningReport: {
-        allTime: totalAmountSpent,
-        last30Days: tasks
-          .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
-          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
-        last7Days: tasks
-          .filter(task => new Date(task.createdAt) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
-        today: tasks
-          .filter(task => new Date(task.createdAt).toDateString() === new Date().toDateString())
-          .reduce((sum, task) => sum + (task.compensation.amount || 0), 0),
+    const result = await Task.aggregate([
+      { $match: { userId: creatorObjectId } },
+      {
+        $lookup: {
+          from: "taskapplications",
+          localField: "_id",
+          foreignField: "taskId",
+          as: "applications"
+        }
       },
-    };
-
-
-    // If exportPdf is requested, generate and send PDF as a stream
-    if (exportPdf === "true") {
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=spending_report_${userId}.pdf`);
-      const doc = new PDFDocument();
-      doc.pipe(res); // Stream directly to response
-
-
-      // PDF Content
-      doc.fontSize(18).text("Spending Over Time Report", { align: "center" }).moveDown();
-      doc.fontSize(14).text(`Total Amount Spent: $${totalAmountSpent}`);
-      doc.text(`Work In Progress Tasks: ${workInProgressTasks}`);
-      doc.text(`Completed Tasks: ${completedTasks}`).moveDown();
-      doc.text("Task Earning Report:");
-      doc.text(`All Time: $${spendingOverTime.taskEarningReport.allTime}`);
-      doc.text(`Last 30 Days: $${spendingOverTime.taskEarningReport.last30Days}`);
-      doc.text(`Last 7 Days: $${spendingOverTime.taskEarningReport.last7Days}`);
-      doc.text(`Today: $${spendingOverTime.taskEarningReport.today}`).moveDown();
-      doc.text("Spending Over Time Graph Data:");
-      spendingOverTime.graphData.forEach(entry => {
-        doc.text(`Date: ${entry.date.toISOString().split("T")[0]}, Amount: $${entry.amount}`);
-      });
-
-
-      doc.end();
-      return;
-    }
-
-
-    // Return JSON response if exportPdf is not requested
-    res.status(200).json({
-      success: true,
-      dashboardData: {
-        totalAmountSpent,
-        workInProgressTasks,
-        completedTasks,
-        spendingOverTime,
-        taskTotal,
+      {
+        $addFields: {
+          approvedCompletions: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: {
+                $and: [
+                  { $eq: ["$$app.earnerStatus", "Completed"] },
+                  { $eq: ["$$app.reviewStatus", "Approved"] }
+                ]
+              }
+            }
+          },
+          inProgressApps: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: { $eq: ["$$app.earnerStatus", "In Progress"] }
+            }
+          },
+          cancelledApps: {
+            $filter: {
+              input: "$applications",
+              as: "app",
+              cond: { $eq: ["$$app.earnerStatus", "Cancelled"] }
+            }
+          }
+        }
       },
+      {
+        $group: {
+          _id: "$userId",
+          totalSpent: {
+            $sum: {
+              $multiply: [
+                { $size: "$approvedCompletions" },
+                { $ifNull: ["$compensation.amount", 0] }
+              ]
+            }
+          },
+          totalTasks: { $sum: 1 },
+          inProgressTasks: { $sum: { $cond: [{ $gt: [{ $size: "$inProgressApps" }, 0] }, 1, 0] } },
+          completedTasks: { $sum: { $cond: [{ $gt: [{ $size: "$approvedCompletions" }, 0] }, 1, 0] } },
+          cancelledTasks: { $sum: { $cond: [{ $gt: [{ $size: "$cancelledApps" }, 0] }, 1, 0] } }
+        }
+      }
+    ]);
+
+
+    const {
+      totalSpent = 0,
+      totalTasks = 0,
+      inProgressTasks = 0,
+      completedTasks = 0,
+      cancelledTasks = 0
+    } = result[0] || {};
+
+
+    // Paginate WIP tasks
+    const skip = (parseInt(wipPage) - 1) * parseInt(wipLimit);
+    const wipTasksQuery = await Task.find({ userId, status: 'In Progress' })
+      .skip(skip)
+      .limit(parseInt(wipLimit))
+      .select('-__v');
+
+
+    const wipTotalCount = await Task.countDocuments({ userId, status: 'In Progress' });
+
+
+    // Profile completion
+    const profileCompletion = await getProfileCompletion(userId);
+
+
+    // Report
+    const report = await getTaskReport(userId, 'all');
+
+
+    // Chart
+    const chartData = await getTaskChartData(userId, chartRange);
+
+
+    res.json({
+      userId,
+      totalSpent,
+      currency: "USD",
+      numberOfTasks: totalTasks,
+      inProgressTasks,
+      completedTasks,
+      cancelledTasks,
+      profileCompletion: profileCompletion.toFixed(1) + "%",
+      report,
+      chartData,
+      wipTasks: {
+        currentPage: parseInt(wipPage),
+        totalPages: Math.ceil(wipTotalCount / parseInt(wipLimit)),
+        count: wipTasksQuery.length,
+        total: wipTotalCount,
+        tasks: wipTasksQuery
+      },
+      metric: "tasks",
+      timestamp: new Date().toISOString()
     });
+
+
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+    console.error(`[GET /tasks/dashboard] Error: ${error.message}`);
+    res.status(500).json({
+      error: "Failed to fetch task creator dashboard.",
+      systemMessage: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
   }
 };
 
+const getProfileCompletion = async (userId) => {
+  try{
+    const creator = await User.findById(userId, "userImageUrl firstName lastName bio languages expertise location");
+    const profileFields = ["userImageUrl", "firstName", "lastName", "bio", "languages", "expertise", "location"];
+    const filledFields = profileFields.filter((field) => creator[field]);
+    const profileCompletion = (filledFields.length / profileFields.length) * 100;
+    return profileCompletion;
+  }
+  catch (error) {
+    console.error(error);
+  }
+}
+
+const getTaskReport = async (userId, range = 'all', options = {}) => {
+  const { includeTasks = false, status = 'Completed' } = options;
+  let dateFilter = {};
+
+
+  switch (range) {
+    case 'today':
+      dateFilter = { completedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } };
+      break;
+    case '7days':
+      dateFilter = { completedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } };
+      break;
+    case '30days':
+      dateFilter = { completedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } };
+      break;
+    case 'custom':
+      if (options.start && options.end) {
+        dateFilter = { completedAt: { $gte: new Date(options.start), $lte: new Date(options.end) } };
+      }
+      break;
+    case 'all':
+    default:
+      break;
+  }
+
+  const query = {
+    userId,
+    ...(status && { status }),
+    ...dateFilter
+  };
+
+  const tasks = await Task.find(query);
+  const totalEarnings = tasks.reduce((sum, task) => sum + (task.compensation || 0), 0);
+
+  return {
+    timeRange: range,
+    totalTasks: tasks.length,
+    totalEarnings,
+    currency: "USD",
+    ...(includeTasks && { tasks })
+  };
+};
+
+const getTaskChartData = async (userId, timeframe = 'weekly', options = {}) => {
+  let groupFormat, dateSubtract;
+  const { status = 'Completed' } = options;
+
+
+  switch (timeframe) {
+    case 'weekly':
+      groupFormat = "%Y-%U"; // Year-Week
+      dateSubtract = 12 * 7 * 24 * 60 * 60 * 1000;
+      break;
+    case 'monthly':
+      groupFormat = "%Y-%m";
+      dateSubtract = 12 * 30 * 24 * 60 * 60 * 1000;
+      break;
+    case 'daily':
+    default:
+      groupFormat = "%Y-%m-%d";
+      dateSubtract = 30 * 24 * 60 * 60 * 1000;
+  }
+
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error("Invalid userId format");
+  }
+
+
+  const chartData = await Task.aggregate([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        ...(status && { status }),
+        completedAt: { $gte: new Date(Date.now() - dateSubtract) }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          date: { $dateToString: { format: groupFormat, date: "$completedAt" } }
+        },
+        earnings: { $sum: "$compensation" },
+        taskCount: { $sum: 1 }
+      }
+    },
+    { $sort: { "_id.date": 1 } }
+  ]);
+
+
+  return chartData.map(item => ({
+    date: item._id.date,
+    earnings: item.earnings,
+    taskCount: item.taskCount
+  }));
+};
 
 const generateTaskReportPDF = async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, range = 'all' } = req.query;
 
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+    // Validate user existence
+    const user = await fetchUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
 
 
-    // Fetch tasks from DB
-    const tasks = await Task.find({ userId });
+    // Get report and chart data
+    const report = await getTaskReport(userId, range);
+    const chartData = await getTaskChartData(userId, range === '30days' ? 'daily' : 'weekly');
 
 
-    // Calculate statistics
-    const totalAmountSpent = tasks.reduce((sum, task) => sum + (task.compensation.amount || 0), 0);
-    const completedTasks = tasks.filter(task => task.status === "completed").length;
-    const workInProgressTasks = tasks.filter(task => task.status === "in-progress").length;
+    // Generate PDF
+    const pdfData = { ...report, chartData };
+    const { filePath, filename } = await generateEarningsPDF(pdfData, user);
 
 
-    // Prepare spending report data
-    const spendingOverTime = tasks.map(task => ({
-      date: task.createdAt.toISOString().split("T")[0],
-      amount: task.compensation.amount || 0,
-      status: task.status,
-      title: task.title,
-    }));
+    // Set response headers and stream PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    fs.createReadStream(filePath).pipe(res);
 
 
-    // Function to generate PDF
-    function buildPDF(dataCallback, endCallback) {
-      const doc = new PDFDocument();
-      doc.on("data", dataCallback);
-      doc.on("end", endCallback);
-
-
-      doc.fontSize(18).text("Task Spending Report", { align: "center" }).moveDown();
-      doc.fontSize(14).text(`Total Amount Spent: $${totalAmountSpent}`);
-      doc.text(`Work In Progress Tasks: ${workInProgressTasks}`);
-      doc.text(`Completed Tasks: ${completedTasks}`).moveDown();
-      doc.text("Spending Over Time:");
-
-
-      spendingOverTime.forEach(entry => {
-        doc.text(`Date: ${entry.date}, Amount: $${entry.amount}, Status: ${entry.status}`);
-      });
-
-
-      doc.end();
-    }
-
-
-    // Set headers correctly
-    res.status(200).set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename=spending_report_${userId}.pdf`,
-    });
-
-
-    buildPDF(
-      chunk => res.write(chunk),
-      () => res.end()
-    );
   } catch (error) {
-    console.error("Error generating PDF:", error);
-    res.status(500).json({ success: false, message: "Error generating PDF" });
+    console.error("PDF generation error:", error);
+    res.status(500).json({ error: "PDF generation failed" });
   }
 };
 
@@ -778,4 +770,5 @@ module.exports = {
   getTaskCreatorDashboard,
   generateTaskReportPDF,
 };
+
 
