@@ -2,8 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./db');
+const logger = require('./middleware/logger');
 const userRoutes = require('./routes/userRoutes');
-const multer = require('multer');
 const taskRoutes = require('./routes/taskRoutes');
 const paymentRoute = require("./routes/paymentRoute");
 const withdrawalRoute = require("./routes/withdrawalRoute");
@@ -14,11 +14,6 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const inAppNotificationRoutes = require("./routes/inAppNotificationRoutes");
 require('dotenv').config();
-const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const logger = require('./middleware/logger');
-
-
 
 const app = express();
 
@@ -46,8 +41,6 @@ const corsOptions = {
     exposedHeaders: ['set-cookie']
 };
 
-
-
 // Middleware to parse raw body for the Stripe webhook
 app.use('/api/v1/webhooks/stripe', express.raw({ type: 'application/json' })); // Correctly set content type
 
@@ -59,31 +52,11 @@ app.use('/api/v1/webhooks/stripe', (req, res, next) => {
     next();
 });
 
-
 // Apply CORS Middleware FIRST (before session)
 app.use(cors(corsOptions));
 
 // Apply Cookie Parser
 app.use(cookieParser());
-
-// Session Configuration (Use MongoDB for session storage)
-// app.use(
-//     session({
-//         secret: process.env.SESSION_SECRET || "sessionsecretcode",
-//         resave: false,
-//         saveUninitialized: false,
-//         store: MongoStore.create({
-//             mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/mydatabase",
-//             collectionName: "sessions",
-//         }),
-//         cookie: { 
-//             httpOnly: true, 
-//             secure: process.env.NODE_ENV === "production", // Set `true` in production
-//             sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // Allow cross-origin cookies in production
-//             maxAge: 24 * 60 * 60 * 1000 // 1 day expiration
-//         }
-//     })
-// );
 
 // Middleware
 app.use(express.json()); // Parse JSON request body
@@ -93,7 +66,6 @@ app.use(logger);
 app.get('/', async (req, res) => {
     return res.send("Welcome to The Alternative Bucks! API");
 });
-
 
 // Routes
 app.use('/users', userRoutes);
@@ -112,7 +84,6 @@ app.use('/uploads', express.static('uploads'));
 app.use((req, res) => {
     res.status(404).json({ status: false, message: 'Route not found' });
 });
-
 
 // Central error handling middleware
 app.use((err, req, res, next) => {
