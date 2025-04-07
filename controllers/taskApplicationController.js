@@ -268,14 +268,12 @@ const fetchAllApplicationsEarnerSchema = Joi.object({
 
 const fetchAllApplicationsEarner = async (req, res) => {
   try {
-    const { error } = fetchAllApplicationsEarnerSchema.validate(req.body);
+    const { error, value } = fetchAllApplicationsEarnerSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
     const earnerId = req.user._id;
-    const { search, status, page, limit } = req.body;
-    const pageNumber = parseInt(page, 10) || 1;
-    const limitNumber = parseInt(limit, 10) || 10;
+    const { search, status, page, limit } = value;
     const skip = (page - 1) * limit;
   
     let applicationQuery = { earnerId };
@@ -307,14 +305,14 @@ const fetchAllApplicationsEarner = async (req, res) => {
     const taskApplications = await TaskApplication.find(applicationQuery)
       .populate("taskId")
       .skip(skip)
-      .limit(limitNumber)
+      .limit(limit)
       .sort({ createdAt: -1 });
   
     res.status(200).json({
       success: true,
       message: "Task applications fetched successfully",
       data: taskApplications,
-      pagination: paginate(total, pageNumber, limitNumber),
+      pagination: paginate(total, page, limit),
     });
   } catch (error) {
     console.error(error);
@@ -398,15 +396,13 @@ const fetchAllApplicationsCreatorSchema = Joi.object({
 
 const fetchAllApplicationsCreator = async (req, res) => {
   try{
-    const { error } = fetchAllApplicationsCreatorSchema.validate(req.body);
+    const { error, value } = fetchAllApplicationsCreatorSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ success: false, message: error.details[0].message });
     }
     const taskCreatorId = req.user._id;
-    const { search, status, page, limit } = req.body;
-    const pageNumber = parseInt(page, 10) || 1;
-    const limitNumber = parseInt(limit, 10) || 10;
-    const skip = (pageNumber - 1) * limitNumber;
+    const { search, status, page, limit } = value;
+    const skip = (page - 1) * limit;
   
     let taskApplicationsQuery = {};
     if (status) taskApplicationsQuery.earnerStatus = status;
@@ -435,14 +431,14 @@ const fetchAllApplicationsCreator = async (req, res) => {
     const taskApplications = await TaskApplication.find(taskApplicationsQuery)
       .populate("taskId")
       .skip(skip)
-      .limit(limitNumber)
+      .limit(limit)
       .sort({ createdAt: -1 });
   
     res.status(200).json({
       success: true,
       message: "Task applications fetched successfully",
       data: taskApplications,
-      pagination: paginate(total, pageNumber, limitNumber),
+      pagination: paginate(total, page, limit),
     });
   }
   catch (error) {

@@ -18,6 +18,7 @@ const {
   updateTaskValidationSchema,
   searchTasksSchema
 } = require("../validations/taskValidation");
+const { paginationQuerySchema } = require("../validations/paginationValidation");
 
 // const createTaskHandler = async (req, res) => {
 //   try {
@@ -229,14 +230,17 @@ const deleteTaskHandler = async (req, res) => {
 // Fetch all tasks handler
 const getAllTasksHandler = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const pageNumber = parseInt(page, 10);
-    const pageSize = parseInt(limit, 10);
-    
-    const skip = (pageNumber - 1) * pageSize;
+    const { error, value } = paginationQuerySchema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+
+    const { page = 1, limit = 10 } = value;    
+    const skip = (page - 1) * limit;
+
     const tasks = await Task.find({ visibility: "Published" })
       .skip(skip)
-      .limit(pageSize)
+      .limit(limit)
       .sort({ createdAt: -1 });
     const total = await Task.countDocuments({ visibility: "Published" });
     
@@ -249,7 +253,6 @@ const getAllTasksHandler = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Internal Server Error",
-      error: error.message,
     })
   }
 };
@@ -257,20 +260,30 @@ const getAllTasksHandler = async (req, res) => {
 // Fetch all tasks for logged in task creator handler
 const getTaskCreatorTasksHandler = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const { error, value } = paginationQuerySchema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
 
-    const tasks = await Task.find({ userId })
+    const { page, limit } = value;
+    const userId = req.user._id;
+    const skip = (page - 1) * limit;
+  
+    const tasks = await Task.find({ userId, visibility: "Published" })
+      .skip(skip)
+      .limit(limit)
       .sort({ createdAt: -1 });
+    const total = await Task.countDocuments({ userId, visibility: "Published" });
 
     return res.status(200).json({
       success: true,
       message: "Tasks fetched successfully!",
       data: tasks,
+      pagination: paginate(total, page, limit),
     });
   } catch (error) {
     return res.status(500).json({
       message: "Internal Server Error",
-      error: error.message,
     })
   }
 };
