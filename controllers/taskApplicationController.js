@@ -274,6 +274,8 @@ const fetchAllApplicationsEarner = async (req, res) => {
     }
     const earnerId = req.user._id;
     const { search, status, page, limit } = req.body;
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
     const skip = (page - 1) * limit;
   
     let applicationQuery = { earnerId };
@@ -305,14 +307,14 @@ const fetchAllApplicationsEarner = async (req, res) => {
     const taskApplications = await TaskApplication.find(applicationQuery)
       .populate("taskId")
       .skip(skip)
-      .limit(limit)
+      .limit(limitNumber)
       .sort({ createdAt: -1 });
   
     res.status(200).json({
       success: true,
       message: "Task applications fetched successfully",
       data: taskApplications,
-      pagination: paginate(total, page, limit),
+      pagination: paginate(total, pageNumber, limitNumber),
     });
   } catch (error) {
     console.error(error);
@@ -402,7 +404,9 @@ const fetchAllApplicationsCreator = async (req, res) => {
     }
     const taskCreatorId = req.user._id;
     const { search, status, page, limit } = req.body;
-    const skip = (page - 1) * limit;
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
   
     let taskApplicationsQuery = {};
     if (status) taskApplicationsQuery.earnerStatus = status;
@@ -431,14 +435,14 @@ const fetchAllApplicationsCreator = async (req, res) => {
     const taskApplications = await TaskApplication.find(taskApplicationsQuery)
       .populate("taskId")
       .skip(skip)
-      .limit(limit)
+      .limit(limitNumber)
       .sort({ createdAt: -1 });
   
     res.status(200).json({
       success: true,
       message: "Task applications fetched successfully",
       data: taskApplications,
-      pagination: paginate(total, page, limit),
+      pagination: paginate(total, pageNumber, limitNumber),
     });
   }
   catch (error) {
