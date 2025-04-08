@@ -120,7 +120,7 @@ const getReferralLink = async (req, res) => {
     if (!referralCode) {
       return res.status(400).json({ status: false, message: "Please log out and log back in" });
     }
-    const referralLink = `${process.env.FRONTEND_SIGN_UP_TASK_EARNER_URL}?referralCode=${referralCode}`;
+    const referralLink = `${process.env.FRONTEND_SIGN_UP_TASK_EARNER_URL}?ref=${referralCode}`;
     res.status(200).json({
       success:true,
       message:"Referral link retrieved successfully!",
