@@ -637,6 +637,92 @@ const deleteUser = async (req, res) => {
   }
 }
 
+const fetchUserProfileStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const result = await TaskApplication.aggregate([
+      { $match: { earnerId: userId } },
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "taskId",
+          foreignField: "_id",
+          as: "taskDetails",
+        },
+      },
+      { $unwind: "$taskDetails" },
+      {
+        $group: {
+          _id: "$earnerId",
+          totalApplications: { $sum: 1 },
+          totalEarnings: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ["$earnerStatus", "Completed"] }, { $eq: ["$reviewStatus", "Approved"] }] },
+                "$taskDetails.compensation.amount",
+                0,
+              ],
+            },
+          },
+          completedTasks: {
+            $sum: { $cond: [{ $eq: ["$earnerStatus", "Completed"] }, 1, 0] },
+          },
+          cancelledTasks: {
+            $sum: { $cond: [{ $eq: ["$earnerStatus", "Cancelled"] }, 1, 0] },
+          }
+        },
+      },
+    ]);
+
+    if (!result.length) {
+      return res.status(200).json({
+        success: true,
+        message: "Earner profile stats fetched successfully",
+        data: {
+          totalApplications: 0,
+          totalEarnings: 0,
+          jobCompletionRate: "0.0%",
+          averageRating: 0,
+        },
+      });
+    }
+
+    const {
+      totalApplications = 0,
+      totalEarnings = 0,
+      completedTasks = 0,
+    } = result[0];
+
+    const jobCompletionRate = totalApplications > 0
+      ? ((completedTasks / totalApplications) * 100).toFixed(1)
+      : "0.0";
+
+    let averageRating = 0;
+    const completion = parseFloat(jobCompletionRate);
+    if (completion >= 90) averageRating = 5;
+    else if (completion >= 75) averageRating = 4;
+    else if (completion >= 50) averageRating = 3;
+    else if (completion >= 25) averageRating = 2;
+    else if (completion > 0) averageRating = 1;
+
+    res.status(200).json({
+      success: true,
+      message: "Earner profile stats fetched successfully",
+      data: {
+        totalApplications,
+        totalEarnings,
+        jobCompletionRate: jobCompletionRate + "%",
+        averageRating,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
 
 
 module.exports = {
@@ -652,4 +738,5 @@ module.exports = {
   updateUserSettings,
   amountEarned,
   deleteUser,
+  fetchUserProfileStats,
 };

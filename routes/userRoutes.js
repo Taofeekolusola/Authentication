@@ -13,7 +13,8 @@ const {
     changeAccountSettings,
     updateUserSettings,
     deleteUser,
-    amountEarned
+    amountEarned,
+    fetchUserProfileStats
 } = require('../controllers/userController');
 const upload = require("../middleware/multer");
 
@@ -24,6 +25,7 @@ route.post('/verify', verifyResetCode)
 route.post('/reset', resetPassword)
 route.post('/request', requestPasswordReset)
 route.get('/user-profile', validation, getUserProfile);
+route.get('/stats', validation, fetchUserProfileStats);
 route.put('/profile', upload.single('avatar'), validation, updateUserProfile);
 route.put('/account-settings', validation, changeAccountSettings);
 route.patch('/settings', validation, updateUserSettings);
