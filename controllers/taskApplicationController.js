@@ -367,7 +367,6 @@ const fetchFeaturedApplicationsCreator = async (req, res) => {
         success: true,
         message: "Task applications fetched successfully",
         data: [],
-        pagination: paginate(0, page, limit),
       });
     }
   
